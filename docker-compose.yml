@@ -1,14 +1,22 @@
+name: tempo
 services:
   postgres:
     image: postgres:16
+    restart: unless-stopped
     environment:
       POSTGRES_USER: tempo
-      POSTGRES_PASSWORD: tempo
+      POSTGRES_PASSWORD: ${TEMPO_DB_PASSWORD:?Set TEMPO_DB_PASSWORD in root .env}
       POSTGRES_DB: tempo
-    ports: ["5432:5432"]
+    ports: ["127.0.0.1:55432:5432"]
     volumes: [tempo_pg:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tempo -d tempo"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
   redis:
     image: redis:7
-    ports: ["6379:6379"]
+    restart: unless-stopped
+    ports: ["127.0.0.1:56379:6379"]
 volumes:
   tempo_pg:

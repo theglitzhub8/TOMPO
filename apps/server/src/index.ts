@@ -16,4 +16,4 @@ if(req.method==='POST'&&url.pathname==='/v1/sync'){const b=await body(req);if(!A
 if(req.method==='POST'&&url.pathname==='/v1/ai/daily-plan'){const b=await body(req);if(!Array.isArray(b.tasks))return json(res,400,{error:'tasks must be an array'});return json(res,200,{proposal:{tasks:b.tasks.map((t:any,i:number)=>({...t,scheduledAt:t.scheduledAt||null,order:i})),protectedRoutineIds:b.protectedRoutineIds||[],requiresConfirmation:true},simulation:true});}
 return json(res,404,{error:'Not found'});
 }catch(e){console.error(e);return json(res,500,{error:'Internal server error'});}});
-if(process.env.DATABASE_URL){store.migrate().then(()=>server.listen(port,()=>console.log(`Tempo server listening on ${port}`))).catch(e=>{console.error(e);process.exit(1)});}else{console.error('DATABASE_URL is required');process.exitCode=1;}
+if(process.env.DATABASE_URL){store.migrate().then(()=>server.listen(port,process.env.HOST||'127.0.0.1',()=>console.log(`Tempo server listening on ${port}`))).catch(e=>{console.error(e);process.exit(1)});}else{console.error('DATABASE_URL is required');process.exitCode=1;}
