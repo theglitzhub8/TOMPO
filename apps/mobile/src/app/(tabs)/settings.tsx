@@ -1,3 +1,4 @@
+import { BackendConnection } from "../../components/backend-connection";
 import { useState } from "react";
 import { router } from "expo-router";
 import { Screen, Card, Heading, Body, Button } from "../../components/ui";
@@ -12,6 +13,7 @@ export default function Settings() {
       title="Set your standards."
       subtitle="Make accountability work for you."
     >
+      <BackendConnection />
       <Card
         style={{
           minHeight: 70,
