@@ -1,0 +1,13 @@
+{
+  "name": "tempo",
+  "private": true,
+  "scripts": {
+    "test": "node --experimental-strip-types --test packages/core/tests/*.test.ts",
+    "typecheck": "npm --prefix apps/mobile run typecheck",
+    "start": "npm --prefix apps/mobile start",
+    "lint": "npm --prefix apps/mobile run lint",
+    "server:dev": "npm --prefix apps/server run dev",
+    "server:build": "npm --prefix apps/server run build",
+    "server:start": "npm --prefix apps/server start"
+  }
+}

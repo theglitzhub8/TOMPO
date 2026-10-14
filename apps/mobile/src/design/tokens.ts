@@ -1,0 +1,23 @@
+// Tempo visual system v2: focused, editorial, high-contrast productivity UI.
+export const theme = {
+  background: "#F3F1EC",
+  surface: "#FFFEFA",
+  darkSurface: "#171717",
+  ink: "#171717",
+  muted: "#77736B",
+  accent: "#FF5C35",
+  accentSoft: "#FFE2D8",
+  line: "#E2DED5",
+  danger: "#D64545",
+  mint: "#FFB09A",
+  progress: "#FFB09A",
+  darkTrack: "#4C4C49",
+  darkMuted: "#B7B4AC",
+  callAvatar: "#343434",
+  callAccept: "#FFB09A",
+  radius: 22,
+  heroRadius: 28,
+  space: 16,
+  typography: { title: 30, heading: 18, body: 13, label: 10 },
+  fonts: { regular: "Inter-Regular", bold: "Inter-Bold" },
+};
