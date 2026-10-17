@@ -4,10 +4,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { theme } from "../design/tokens";
 const destinations: { path: Href; title: string; icon: string }[] = [
   { path: "/", title: "Today", icon: "⌂" },
-  { path: "/planning", title: "Plan", icon: "✦" },
-  { path: "/projects", title: "Projects", icon: "▦" },
-  { path: "/tasks", title: "Tasks", icon: "☑" },
-  { path: "/assistant", title: "Calls", icon: "☎" },
+  { path: "/planning", title: "Tell Tempo", icon: "✦" },
+  { path: "/settings", title: "Settings", icon: "☷" },
 ];
 export function BottomBar() {
   const pathname = usePathname();
@@ -16,10 +14,12 @@ export function BottomBar() {
     <View
       style={{
         backgroundColor: theme.surface,
+        borderTopWidth: 1,
+        borderTopColor: theme.line,
         paddingBottom: insets.bottom,
         paddingTop: 12,
         flexDirection: "row",
-        minHeight: 88,
+        minHeight: 82,
       }}
     >
       {destinations.map((item) => {

@@ -15,6 +15,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTempo } from "../data/store";
 import { BottomBar } from "./navigation";
+import { Brand } from "./brand";
 import { theme } from "../design/tokens";
 export { theme } from "../design/tokens";
 export const styles = StyleSheet.create({
@@ -99,11 +100,11 @@ export function Screen({
 }) {
   const pathname = usePathname();
   const timezone = useTempo((s) => s.preferences.timezone);
+  const cloudError = useTempo((s) => (s.user ? s.error : null));
   const detail = [
     "/onboarding",
     "/reports",
     "/notification-test",
-    "/settings",
     "/health",
   ].includes(pathname);
   const date = new Intl.DateTimeFormat("en-US", {
@@ -149,15 +150,7 @@ export function Screen({
                 }
                 hitSlop={12}
               >
-                <Text
-                  style={{
-                    fontFamily: theme.fonts.bold,
-                    fontSize: 22,
-                    color: theme.ink,
-                  }}
-                >
-                  tempo /
-                </Text>
+                <Brand />
               </Pressable>
               <Text
                 style={{
@@ -177,6 +170,11 @@ export function Screen({
               </Text>
               {subtitle && <Text style={styles.body}>{subtitle}</Text>}
             </View>
+            {!!cloudError && (
+              <Text accessibilityRole="alert" style={styles.error}>
+                {cloudError}
+              </Text>
+            )}
             {children}
           </ScrollView>
         </KeyboardAvoidingView>

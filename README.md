@@ -1,45 +1,69 @@
-# TEMPO
+# Tempo
 
-China-first personal discipline assistant. This repository implements the first foundation milestone of Sprint 1: Expo Router navigation, approved Figma design tokens, local task/project/routine/preferences persistence, a deterministic planner, and core tests. The approved nine-screen Figma file is now the visual reference. See [design mapping and adaptations](docs/DESIGN_REFERENCE.md).
+**Sign up → speak or type everything you need to do → get a realistic day plan → follow one next step.**
 
-## Run
+Tempo includes one-take voice/text capture, AI task breakdown, fixed appointments, protected routines, breaks, overflow, completion, and replanning. The main app has Today, Tell Tempo, and Settings. The new brand kit lives in `apps/mobile/assets/brand`.
 
-Requires Node 24+, npm, Xcode for iOS, and Android Studio / SDK for Android.
+## Accounts and online storage
+
+An account is required before any planner screen can open, including deep links. The API independently enforces sign-in for planning, profiles, and workspace access.
+
+Names, email addresses, tasks, projects, routines, and preferences are stored in PostgreSQL under the authenticated user’s ID. Passwords use salted scrypt hashes. Native session tokens use SecureStore; browser tokens are scoped to the tab. Signing out clears the active workspace and draft from app memory and revokes the session when the backend is reachable.
+
+The backend is the source of truth. Sign in on another device to restore the workspace, or use Settings → Refresh saved plan. Saves require a connection and succeed only after the backend commits. Failed writes show an error; conflicting device edits return the latest saved version for review. Old anonymous SQLite files are preserved but are not automatically assigned to a new account.
+
+## Run locally
+
+Requires Node 24+, npm, Docker for local PostgreSQL, and platform tools for native builds.
 
 ```sh
 npm --prefix apps/mobile ci
-npm test
-npm run typecheck
-npm --prefix apps/mobile run ios
-npm --prefix apps/mobile run android
+npm --prefix apps/server ci
+# Set a private TEMPO_DB_PASSWORD in root .env.
+docker compose up -d postgres
+# Configure apps/server/.env from .env.example, matching the database password.
+npm run server:dev
 ```
 
-The native commands generate development builds; signing / device setup may be needed. `npm start` runs Metro. Do not use the web preview as proof of native SQLite behavior.
+In another terminal:
 
-## Layout
+```sh
+# iOS simulator uses this computer’s loopback API:
+EXPO_PUBLIC_TEMPO_API_URL=http://127.0.0.1:8787 npm start
+npm --prefix apps/mobile run ios
+```
 
-- `apps/mobile/src/app`: all nine screens, five main tabs, and notification test route.
-- `apps/mobile/src/components`: reusable UI primitives and preference editor. Reusable UI primitives live in `ui.tsx`; colors, typography, spacing, and radii are modular in `src/design/tokens.ts`. These follow the approved Figma file.
-- `apps/mobile/src/data`: Zustand store and Expo SQLite adapter. TanStack Query provider is ready for future server queries.
-- `packages/core/src`: domain validation, SQLite repository/migration, timezone conversion, protected routine scheduling, reminder policy.
-- `packages/core/tests`: real SQLite restart, rollback, concurrent-write, scheduling, timezone, and reminder tests using Node's built-in test runner.
-- `apps/server`: reserved backend boundary; no server is running or connected.
-- `docs`: milestone status and device verification instructions.
+Android emulator uses `http://10.0.2.2:8787`. A physical phone needs an accessible HTTPS API. Without an override, the app targets `https://tempo-api.hafrik.com`. A saved API URL is also supported; an explicit build environment override takes precedence.
 
-## Functional foundation
+For a browser preview with the local backend:
 
-Create and rename projects. Create/edit/complete/reopen/postpone tasks and assign projects. Schedule tasks at explicit timezone-local dates/times. Configure protected recurring routines by weekday. Set an IANA timezone, accountability mode, and quiet hours. Create a local day plan around routines and existing scheduled tasks. View local progress and a foreground focus timer. Exercise clearly labeled simulated call states with consent/opt-out.
+```sh
+cd apps/mobile
+EXPO_PUBLIC_TEMPO_API_URL=http://localhost:8084 npx expo export --platform web --output-dir /tmp/tempo-rebuild-web
+cd ../..
+python3 scripts/preview-web.py /tmp/tempo-rebuild-web --port 8084
+```
 
-SQLite entities and their pending synchronization records commit together. UI state updates after persistence succeeds. Writes are serialized, values are validated, and SQL values are parameterized. The outbox is durable but **does not synchronize**: no network endpoint is configured. Local data is unencrypted and device-local; uninstalling the app removes it. No API credentials are present.
+Open `http://localhost:8084`. The local preview proxy forwards `/v1/` account/API requests to port 8787, including authentication headers. Use a reachable HTTPS backend and configured CORS origins for a hosted browser deployment.
 
-## Pending Sprint 1 work
+## Voice, AI, and assets
 
-- Complete broader accessibility and device QA.
-- Expo Notifications permissions, capability reporting, idempotent local scheduling, Android channels, and device delivery tests. The test route explicitly says permissions have not been queried.
-- Real provider-independent voice/telephone adapters, durable call history, delivery recovery. Current demo sends no audio and places no calls.
-- Separate AI providers, structured server validation, consent enforcement, and review flows.
-- Authenticated Node/TypeScript API, PostgreSQL sync/conflict handling, Redis/BullMQ jobs, push delivery.
-- Persistent focus session history and accountability history.
-- Signed iOS/Android device validation and release dependency audit remediation.
+Voice uses `expo-speech-recognition` with microphone/speech permissions and a visible listening state. It requires a rebuilt native app. Speech-service availability, network needs, and session limits vary by device; typing and keyboard dictation remain available. Tempo does not save audio recordings.
 
-These are not represented as working features. The full Sprint 1 acceptance criteria are not yet met.
+Set `ANTHROPIC_API_KEY` on the backend to enable AI extraction. If the provider is unavailable, authenticated users can review a clearly labeled local fallback plan. It recognizes common English lists and explicit appointment times; it does not replace full natural-language AI understanding.
+
+App icon, favicon, Android adaptive/themed icon, and splash configuration use the new brand assets. Native icon/splash changes need a fresh build. `apps/mobile/assets/brand/README.md` documents palette, usage, and the generation prompt set.
+
+Source changes do not deploy the hosted backend or replace an installed phone app. Background reminders, password-reset email, and email verification are not connected.
+
+## Verify
+
+```sh
+npm test
+npm run typecheck
+npm run lint
+npm --prefix apps/server test
+npm run server:build
+```
+
+The real PostgreSQL integration suite additionally requires `TEST_DATABASE_URL` and creates its own isolated schema. See `apps/server/README.md`. Verification covers account creation, password hashing, user isolation, plan restoration, atomic rollback, concurrent edits, deletion/recreation, server restart, logout, expired sessions, and the planner’s scheduling rules.

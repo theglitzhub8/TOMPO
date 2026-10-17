@@ -60,12 +60,15 @@ export function TaskEditor({
               "Enter both date and start time, or leave both empty",
             );
           await onSave({
+            ...task,
             id: task?.id ?? id(),
             title: title.trim(),
             duration: Number(duration),
             projectId,
             status: task?.status ?? "pending",
             completedAt: task?.completedAt ?? null,
+            fixed: !!day,
+            plannedDay: day || task?.plannedDay,
             scheduledAt: day
               ? localInstant(day, clock, preferences.timezone).toISOString()
               : null,

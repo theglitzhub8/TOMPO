@@ -7,6 +7,9 @@ export type Task = {
   status: "pending" | "completed";
   scheduledAt: string | null;
   completedAt: string | null;
+  fixed?: boolean;
+  steps?: string[];
+  plannedDay?: string;
 };
 export type Project = { id: string; title: string };
 export type Routine = {
@@ -23,6 +26,7 @@ export type Preferences = {
   quietStart: string;
   quietEnd: string;
   onboardingComplete: boolean;
+  dayEnd?: string;
 };
 export type EntityMap = {
   task: Task;
@@ -58,6 +62,7 @@ export function validate(
     if (
       !validTimezone(p.timezone) ||
       !["Gentle", "Firm", "Strict"].includes(p.mode) ||
+      (p.dayEnd !== undefined && !validClock(p.dayEnd)) ||
       !validClock(p.quietStart) ||
       !validClock(p.quietEnd) ||
       typeof p.onboardingComplete !== "boolean"
@@ -82,6 +87,17 @@ export function validate(
       )
     )
       throw new Error("Invalid task status or date");
+    if (
+      (t.fixed !== undefined && typeof t.fixed !== "boolean") ||
+      (t.steps !== undefined &&
+        (!Array.isArray(t.steps) ||
+          t.steps.length > 8 ||
+          t.steps.some(
+            (s) => typeof s !== "string" || !s.trim() || s.length > 200,
+          ))) ||
+      (t.plannedDay !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(t.plannedDay))
+    )
+      throw new Error("Invalid planning details");
     if ((t.status === "completed") !== (t.completedAt !== null))
       throw new Error("Completion time must match status");
   }

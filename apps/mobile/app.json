@@ -4,7 +4,7 @@
     "slug": "tempo",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/brand/tempo-app-icon.png",
     "scheme": "tempo",
     "userInterfaceStyle": "light",
     "ios": {
@@ -13,24 +13,38 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "backgroundColor": "#17202A",
+        "foregroundImage": "./assets/brand/tempo-mark.png",
+        "monochromeImage": "./assets/brand/tempo-mark.png"
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.tempo.discipline"
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/brand/tempo-app-icon.png"
     },
     "plugins": [
       "expo-router",
       "expo-sqlite",
       "expo-dev-client",
-      "expo-splash-screen",
-      "expo-secure-store"
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/brand/tempo-mark.png",
+          "imageWidth": 160,
+          "backgroundColor": "#F5F5F0",
+          "resizeMode": "contain"
+        }
+      ],
+      "expo-secure-store",
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Allow Tempo to hear what you need to do today.",
+          "speechRecognitionPermission": "Allow Tempo to turn your words into a daily plan."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

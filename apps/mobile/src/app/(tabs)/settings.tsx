@@ -1,116 +1,78 @@
-import { BackendConnection } from "../../components/backend-connection";
 import { useState } from "react";
 import { router } from "expo-router";
-import { Screen, Card, Heading, Body, Button } from "../../components/ui";
-import { PreferencesForm } from "../../components/preferences";
+import {
+  Screen,
+  Card,
+  Heading,
+  Body,
+  Button,
+  Field,
+  Action,
+} from "../../components/ui";
+import { BackendConnection } from "../../components/backend-connection";
 import { useTempo } from "../../data/store";
 export default function Settings() {
-  const { preferences } = useTempo();
-  const [editing, setEditing] = useState(false);
+  const { preferences, save } = useTempo();
+  const [timezone, setTimezone] = useState(preferences.timezone);
   return (
     <Screen
-      eyebrow="PERSONALIZATION"
-      title="Set your standards."
-      subtitle="Make accountability work for you."
+      eyebrow="MAKE IT YOURS"
+      title="Around your life."
+      subtitle="A little setup, when you need it."
     >
       <BackendConnection />
-      <Card
-        style={{
-          minHeight: 70,
-          paddingHorizontal: 18,
-          paddingVertical: 16,
-          gap: 7,
-        }}
-        onPress={() => setEditing(!editing)}
-        label="Configure accountability mode"
-      >
-        <Heading small>Accountability mode</Heading>
-        <Body small>{preferences.mode} · configurable</Body>
+      <Card>
+        <Heading small>Your timezone</Heading>
+        <Body>Your plan and appointment times follow this timezone.</Body>
+        <Field label="Timezone" value={timezone} onChangeText={setTimezone} />
+        <Action
+          title="Save timezone"
+          run={async () => {
+            await save("preferences", {
+              ...preferences,
+              timezone: timezone.trim(),
+            });
+          }}
+        />
       </Card>
-      <Card
-        style={{
-          minHeight: 70,
-          paddingHorizontal: 18,
-          paddingVertical: 16,
-          gap: 7,
-        }}
-        onPress={() => router.push("/notification-test")}
-        label="Notification preferences"
-      >
-        <Heading small>Notification preferences</Heading>
-        <Body small>Integration pending · view capabilities</Body>
+      <Card>
+        <Heading small>Things that already have a time</Heading>
+        <Body>
+          Add regular meals, school runs, or other routines. Tempo plans around
+          them.
+        </Body>
+        <Button
+          title="Manage my routines"
+          onPress={() => router.navigate("/health")}
+        />
       </Card>
-      <Card
-        style={{
-          minHeight: 70,
-          paddingHorizontal: 18,
-          paddingVertical: 16,
-          gap: 7,
-        }}
-        onPress={() => router.navigate("/assistant")}
-        label="In-app voice calls"
-      >
-        <Heading small>In-app voice calls</Heading>
-        <Body small>Simulation only · available after integration</Body>
+      <Card>
+        <Heading small>Your tasks</Heading>
+        <Body>
+          Edit tasks, change appointment times, and see things waiting for
+          another day.
+        </Body>
+        <Button
+          title="View all tasks"
+          onPress={() => router.navigate("/tasks")}
+        />
       </Card>
-      <Card
-        style={{
-          minHeight: 70,
-          paddingHorizontal: 18,
-          paddingVertical: 16,
-          gap: 7,
-        }}
-      >
-        <Heading small>Telephone backup</Heading>
-        <Body small>Provider setup required</Body>
-      </Card>
-      <Card
-        style={{
-          minHeight: 70,
-          paddingHorizontal: 18,
-          paddingVertical: 16,
-          gap: 7,
-        }}
-        onPress={() => setEditing(!editing)}
-        label="Configure quiet hours"
-      >
-        <Heading small>Sleep protection</Heading>
+      <Card>
+        <Heading small>Voice and text</Heading>
+        <Body>
+          Tap Tell Tempo to speak or type everything in one go. You can edit the
+          transcript before planning. Speech uses your phone’s recognition
+          service and may need internet.
+        </Body>
         <Body small>
-          Quiet hours {preferences.quietStart}–{preferences.quietEnd}
+          On an older build, use the microphone on your keyboard to dictate into
+          the same input.
         </Body>
       </Card>
-      <Card
-        style={{
-          minHeight: 70,
-          paddingHorizontal: 18,
-          paddingVertical: 16,
-          gap: 7,
-        }}
-        onPress={() => setEditing(!editing)}
-        label="Configure timezone"
-      >
-        <Heading small>Time zone · {preferences.timezone}</Heading>
-        <Body small>
-          {
-            new Intl.DateTimeFormat("en-US", {
-              timeZone: preferences.timezone,
-              timeZoneName: "longOffset",
-            })
-              .formatToParts(new Date())
-              .find((p) => p.type === "timeZoneName")?.value
-          }
-        </Body>
-      </Card>
-      {editing && <PreferencesForm />}
-      <Button
-        title="Personal preferences"
-        onPress={() => router.push("/onboarding")}
-      />
-      <Button title="Routines" onPress={() => router.navigate("/health")} />
-      <Button
-        title="Accountability reports"
-        onPress={() => router.push("/reports")}
-      />
+      <Body small>
+        Your plan follows your account across devices. Background reminders are
+        not connected.
+      </Body>
     </Screen>
   );
 }

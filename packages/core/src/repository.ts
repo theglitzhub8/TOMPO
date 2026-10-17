@@ -42,10 +42,16 @@ export class Repository {
     return this.saveMany(kind, [entity]);
   }
   saveMany<K extends keyof EntityMap>(kind: K, entities: EntityMap[K][]) {
-    const records = entities.map((entity) => {
+    return this.saveBatch(entities.map((entity) => ({ kind, entity })));
+  }
+  saveBatch(
+    entries: { kind: keyof EntityMap; entity: EntityMap[keyof EntityMap] }[],
+  ) {
+    const records = entries.map(({ kind, entity }) => {
       validate(kind, entity);
       return {
         entity,
+        kind,
         id:
           kind === "preferences" ? "singleton" : (entity as { id: string }).id,
         payload: JSON.stringify(entity),
@@ -54,7 +60,7 @@ export class Repository {
     const operation = this.queue.then(async () => {
       await this.db.execAsync("BEGIN IMMEDIATE");
       try {
-        for (const { entity, id, payload } of records) {
+        for (const { kind, entity, id, payload } of records) {
           if (kind === "task") {
             const project = (entity as EntityMap["task"]).projectId;
             if (
@@ -95,10 +101,24 @@ export class Repository {
     const operation = this.queue.then(async () => {
       await this.db.execAsync("BEGIN IMMEDIATE");
       try {
-        await this.db.runAsync("DELETE FROM entities WHERE kind = ? AND id = ?", kind, id);
-        await this.db.runAsync("INSERT INTO outbox(kind,entity_id,payload,revision,created_at) VALUES(?,?,?,?,?)", kind, id, "null", 0, new Date().toISOString());
+        await this.db.runAsync(
+          "DELETE FROM entities WHERE kind = ? AND id = ?",
+          kind,
+          id,
+        );
+        await this.db.runAsync(
+          "INSERT INTO outbox(kind,entity_id,payload,revision,created_at) VALUES(?,?,?,?,?)",
+          kind,
+          id,
+          "null",
+          0,
+          new Date().toISOString(),
+        );
         await this.db.execAsync("COMMIT");
-      } catch (error) { await this.db.execAsync("ROLLBACK"); throw error; }
+      } catch (error) {
+        await this.db.execAsync("ROLLBACK");
+        throw error;
+      }
     });
     this.queue = operation.catch(() => undefined);
     return operation;

@@ -1,61 +1,30 @@
-import { useState } from "react";
-import { Text, View } from "react-native";
-import { Screen, Card, Heading, Body, Button, theme } from "../components/ui";
-import { PreferencesForm } from "../components/preferences";
+import { router } from "expo-router";
+import { Screen, Card, Heading, Body, Button } from "../components/ui";
 export default function Onboarding() {
-  const [setup, setSetup] = useState(false);
   return (
     <Screen
       eyebrow="WELCOME TO TEMPO"
-      title="Own your time."
-      subtitle="Your personal accountability assistant."
+      title="Tell it all. Take it one at a time."
+      subtitle="Your day starts with one conversation."
     >
-      <Card
-        dark
-        style={{
-          minHeight: 180,
-          paddingHorizontal: 24,
-          paddingTop: 21,
-          paddingBottom: 44,
-          justifyContent: "space-between",
-          marginTop: 10,
-        }}
-      >
-        <Text
-          style={{
-            fontSize: 50,
-            fontFamily: theme.fonts.bold,
-            color: theme.mint,
-            textAlign: "center",
-          }}
-        >
-          ✦
-        </Text>
-        <Text
-          style={{
-            fontFamily: theme.fonts.bold,
-            fontSize: 21,
-            color: theme.surface,
-          }}
-        >
-          Your day. Under control.
-        </Text>
-      </Card>
-      <Card style={{ minHeight: 140, marginTop: 4 }}>
-        <Heading size={15}>Your assistant will help you:</Heading>
-        <View>
-          <Body>✓ Plan realistic days</Body>
-          <Body>✓ Finish unfinished work</Body>
-          <Body>✓ Protect your sleep and health</Body>
-        </View>
-      </Card>
-      <View style={{ marginTop: 15 }}>
+      <Card>
+        <Heading>Wake up. Let it out.</Heading>
+        <Body>
+          Say or type everything you need to do, including appointments and
+          anything important.
+        </Body>
+        <Heading>Get a realistic plan.</Heading>
+        <Body>
+          Tempo finds room around your commitments, estimates task lengths, and
+          leaves breathing room.
+        </Body>
+        <Heading>Follow your next step.</Heading>
+        <Body>Mark things done. Replan from now when life happens.</Body>
         <Button
-          title={setup ? "Close preferences" : "Get started"}
-          onPress={() => setSetup(!setup)}
+          title="Let’s plan my day →"
+          onPress={() => router.replace("/planning")}
         />
-      </View>
-      {setup && <PreferencesForm onboarding />}
+      </Card>
     </Screen>
   );
 }
