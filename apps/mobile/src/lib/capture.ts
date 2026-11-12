@@ -12,7 +12,7 @@ export async function understandDay(
   timezone: string,
 ): Promise<Capture> {
   if (!useTempo.getState().user) throw new Error("Sign in to use Tempo.");
-  if (!text.trim() || text.length > 12000) return parseCapture(text);
+  if (!text.trim() || text.length > 12000) return parseCapture(text, day);
   try {
     const data = await useTempo
       .getState()
@@ -44,7 +44,7 @@ export async function understandDay(
       (error instanceof ApiError && error.status === 401)
     )
       throw error;
-    const local = parseCapture(text);
+    const local = parseCapture(text, day);
     local.notes.unshift(
       "The AI connection is unavailable, so Tempo made a quick local plan.",
     );

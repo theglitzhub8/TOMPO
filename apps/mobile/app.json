@@ -33,7 +33,7 @@
         {
           "image": "./assets/brand/tempo-mark.png",
           "imageWidth": 160,
-          "backgroundColor": "#F5F5F0",
+          "backgroundColor": "#0F1A24",
           "resizeMode": "contain"
         }
       ],
@@ -43,6 +43,38 @@
         {
           "microphonePermission": "Allow Tempo to hear what you need to do today.",
           "speechRecognitionPermission": "Allow Tempo to turn your words into a daily plan."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#E86A4A"
+        }
+      ],
+      [
+        "expo-widgets",
+        {
+          "widgets": [
+            {
+              "name": "TempoNext",
+              "displayName": "Tempo Next",
+              "description": "Your next planned task, one thing at a time.",
+              "ios": {
+                "supportedFamilies": [
+                  "systemSmall",
+                  "systemMedium",
+                  "accessoryRectangular",
+                  "accessoryInline"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "Allow Tempo to show calendar events so you can choose which appointments to add to your plan."
         }
       ]
     ],

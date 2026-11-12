@@ -23,7 +23,7 @@ App icon and mark masters are 1254 × 1254 pixels. Preserve their square canvas 
 | Warm background | `#F5F5F0` | App surfaces |
 | White | `#FFFFFF` | Cards and contrast |
 
-The app uses its existing Inter Regular and Bold font files. Keep the logo lowercase. Leave clear space around the symbol, avoid stretching, and use the same palette across onboarding, settings, and marketing.
+Type: Plus Jakarta Sans (400–800) for interface text, Instrument Serif (regular and italic) for display headlines, and a 7 KB Material Symbols subset (`TempoIcons.ttf`) for icons. All are bundled in `assets/fonts` with their licenses. Keep the logo lowercase. Leave clear space around the symbol, avoid stretching, and use the same palette across onboarding, settings, and marketing.
 
 ## Native integration
 

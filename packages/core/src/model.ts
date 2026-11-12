@@ -10,6 +10,13 @@ export type Task = {
   fixed?: boolean;
   steps?: string[];
   plannedDay?: string;
+  dueDay?: string;
+  priority?: "low" | "normal" | "high";
+  startedAt?: string | null;
+  recurrence?: { days: number[]; startDay: string; skippedDays?: string[] };
+  seriesId?: string;
+  occurrenceDay?: string;
+  carriedFrom?: string[];
 };
 export type Project = { id: string; title: string };
 export type Routine = {
@@ -34,8 +41,16 @@ export type EntityMap = {
   routine: Routine;
   preferences: Preferences;
 };
+// New accounts start on the device's own clock, falling back to UTC.
+const deviceZone = (() => {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  } catch {
+    return "UTC";
+  }
+})();
 export const defaults: Preferences = {
-  timezone: "Asia/Shanghai",
+  timezone: deviceZone,
   mode: "Gentle",
   quietStart: "22:00",
   quietEnd: "07:00",
@@ -80,6 +95,12 @@ export function validate(
     throw new Error("Duration must be 1–1440 minutes");
   if (kind === "task") {
     const t = value as Task;
+    validateTaskLifecycle(t);
+    if ((t.dueDay !== undefined && !validDay(t.dueDay)) ||
+      (t.priority !== undefined && !["low", "normal", "high"].includes(t.priority)) ||
+      (t.startedAt !== undefined && t.startedAt !== null && (typeof t.startedAt !== "string" || !Number.isFinite(Date.parse(t.startedAt)))))
+      throw new Error("Check the task deadline, priority, or start time.");
+    if (t.recurrence && t.id.length > 99) throw new Error("Recurring task identifier is too long.");
     if (
       !["pending", "completed"].includes(t.status) ||
       [t.scheduledAt, t.completedAt].some(
@@ -111,4 +132,26 @@ export function validate(
     )
       throw new Error("Invalid recurring routine");
   }
+}
+
+export function validDay(value: unknown): value is string {
+  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) &&
+    Number.isFinite(Date.parse(`${value}T12:00:00Z`)) &&
+    new Date(`${value}T12:00:00Z`).toISOString().slice(0, 10) === value;
+}
+
+/** Shared by the device and API so cloud round trips retain lifecycle metadata. */
+export function validateTaskLifecycle(t: Pick<Task, "recurrence" | "seriesId" | "occurrenceDay" | "carriedFrom">) {
+  if (t.recurrence !== undefined && (!t.recurrence ||
+    !Array.isArray(t.recurrence.days) || !t.recurrence.days.length || t.recurrence.days.length > 7 ||
+    t.recurrence.days.some(d => !Number.isInteger(d) || d < 0 || d > 6) ||
+    !validDay(t.recurrence.startDay) ||
+    (t.recurrence.skippedDays !== undefined && (!Array.isArray(t.recurrence.skippedDays) ||
+      t.recurrence.skippedDays.length > 366 || t.recurrence.skippedDays.some(d => !validDay(d)))))) throw new Error("Choose valid repeat days and a start date.");
+  if ((t.seriesId !== undefined && (typeof t.seriesId !== "string" || !/^[a-zA-Z0-9][a-zA-Z0-9:_-]{0,99}$/.test(t.seriesId))) ||
+    (t.occurrenceDay !== undefined && !validDay(t.occurrenceDay)) ||
+    ((t.seriesId === undefined) !== (t.occurrenceDay === undefined))) throw new Error("Invalid recurring occurrence.");
+  if (t.recurrence && t.seriesId) throw new Error("An occurrence cannot create another series.");
+  if (t.carriedFrom !== undefined && (!Array.isArray(t.carriedFrom) || t.carriedFrom.length > 366 ||
+    t.carriedFrom.some(d => !validDay(d)))) throw new Error("Invalid carry-forward history.");
 }

@@ -10,6 +10,8 @@ import {
 } from "../../../../packages/core/src/model";
 import * as session from "../lib/session";
 import { ApiError, apiBase, request } from "../lib/api";
+import { recurringOccurrences, skipOccurrences } from "../../../../packages/core/src/day-lifecycle";
+import { localParts } from "../../../../packages/core/src/scheduling";
 export type {
   Task,
   Project,
@@ -17,6 +19,65 @@ export type {
   Preferences,
 } from "../../../../packages/core/src/model";
 export type Account = { id: string; name: string; email: string };
+export type SharedTask = {
+  title: string;
+  duration: number;
+  status: "pending" | "completed";
+  scheduledAt: string | null;
+  completedAt: string | null;
+  steps?: string[] | null;
+  plannedDay?: string | null;
+  fixed?: boolean | null;
+};
+export type IncomingShare = {
+  ownerId: string;
+  taskId: string;
+  status: "pending" | "accepted";
+  ownerName: string;
+  ownerEmail: string;
+  projectTitle: string | null;
+  task: SharedTask;
+};
+export type OutgoingShare = {
+  taskId: string;
+  memberId: string;
+  status: "pending" | "accepted" | "declined";
+  name: string;
+  email: string;
+};
+export type Shares = { incoming: IncomingShare[]; outgoing: OutgoingShare[] };
+
+/** The phone's own timezone, used so plans follow the clock on the device. */
+export function deviceTimezone() {
+  try {
+    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    new Intl.DateTimeFormat("en", { timeZone: zone }).format();
+    return zone;
+  } catch {
+    return null;
+  }
+}
+
+// Teammates' tasks enter the planner as read-only fixed blocks. These ids never get saved.
+const sharedPrefix = "shared:";
+export const isSharedId = (taskId: string) => taskId.startsWith(sharedPrefix);
+export function sharedPlanTasks(incoming: IncomingShare[]): Task[] {
+  return incoming
+    .filter((s) => s.status === "accepted" && s.task.scheduledAt)
+    .map((s) => ({
+      id: `${sharedPrefix}${s.ownerId}:${s.taskId}`,
+      title: s.task.title,
+      duration: s.task.duration,
+      projectId: null,
+      status: s.task.status,
+      scheduledAt: s.task.scheduledAt,
+      completedAt: s.task.completedAt,
+      fixed: true,
+    }));
+}
+export function shareForId(incoming: IncomingShare[], taskId: string) {
+  return incoming.find((s) => `${sharedPrefix}${s.ownerId}:${s.taskId}` === taskId);
+}
 type Workspace = {
   revision: number;
   records: {
@@ -38,6 +99,11 @@ type Connection = {
   epoch: number;
 };
 let connection: Connection | null = null;
+// This phone's push address, so signing out can stop its notifications.
+let devicePushToken: string | null = null;
+export function rememberPushToken(token: string | null) {
+  devicePushToken = token;
+}
 let epoch = 0;
 let initialization: Promise<void> | undefined;
 let writes: Promise<unknown> = Promise.resolve();
@@ -60,6 +126,8 @@ const empty = () => ({
   revision: 0,
   lastSavedAt: null as string | null,
   pending: 0,
+  undoEntry: null as { changes: Change[]; revision: number } | null,
+  shares: { incoming: [], outgoing: [] } as Shares,
 });
 function decodeWorkspace(workspace: Workspace) {
   if (
@@ -107,12 +175,22 @@ type State = {
   user: Account | null;
   captureText: string;
   pending: number;
+  undoEntry: { changes: Change[]; revision: number } | null;
+  undo: () => Promise<void>;
   revision: number;
   lastSavedAt: string | null;
   tasks: Task[];
   projects: Project[];
   routines: Routine[];
   preferences: Preferences;
+  shares: Shares;
+  loadShares: () => Promise<void>;
+  sync: () => Promise<void>;
+  invite: (taskId: string, email: string) => Promise<void>;
+  respondShare: (ownerId: string, taskId: string, accept: boolean) => Promise<void>;
+  removeShare: (ownerId: string, taskId: string, memberId: string) => Promise<void>;
+  setSharedDone: (ownerId: string, taskId: string, done: boolean) => Promise<void>;
+  removeTasks: (ids: string[]) => Promise<void>;
   setCaptureText: (value: string) => void;
   initialize: () => Promise<void>;
   reload: () => Promise<void>;
@@ -124,7 +202,10 @@ type State = {
   updateName: (name: string) => Promise<void>;
   saveTasks: (tasks: Task[]) => Promise<void>;
   savePlan: (tasks: Task[], dayEnd: string) => Promise<void>;
+  saveReviewedPlan: (tasks: Task[], dayEnd: string, revision: number) => Promise<void>;
+  refreshRecurring: () => Promise<void>;
   remove: (kind: keyof EntityMap, id: string) => Promise<void>;
+  removeProject: (id: string) => Promise<void>;
   save: <K extends keyof EntityMap>(
     kind: K,
     value: EntityMap[K],
@@ -172,12 +253,19 @@ export const useTempo = create<State>((set, get) => {
       throw e;
     }
   }
-  async function mutate(changes: Change[]) {
+  async function mutate(changes: Change[], expectedRevision?: number, recordUndo = true) {
     if (!changes.length) return;
     const active = connection;
     if (!active) throw new Error("Sign in to save your plan.");
     const work = writes.then(async () => {
       check(active);
+      if (expectedRevision !== undefined && get().revision !== expectedRevision)
+        throw new Error("Your plan changed. Review it again before saving.");
+      const snapshot = get();
+      const inverse: Change[] = changes.map(change => {
+        const values = change.kind === "task" ? snapshot.tasks : change.kind === "project" ? snapshot.projects : change.kind === "routine" ? snapshot.routines : null;
+        return { kind: change.kind, id: change.id, payload: values ? values.find(v => v.id === change.id) ?? null : { ...snapshot.preferences } };
+      });
       set({ pending: get().pending + 1 });
       try {
         const result = await cloud<Workspace>("/v1/workspace", {
@@ -185,7 +273,8 @@ export const useTempo = create<State>((set, get) => {
           changes,
         });
         check(active);
-        set({ ...decodeWorkspace(result), error: null });
+        set({ ...decodeWorkspace(result), error: null,
+          ...(recordUndo ? { undoEntry: changes.some(c => c.payload === null) ? null : { changes: inverse, revision: result.revision } } : {}) });
       } catch (e) {
         if (
           e instanceof ApiError &&
@@ -210,6 +299,28 @@ export const useTempo = create<State>((set, get) => {
     });
     writes = work.catch(() => undefined);
     return work;
+  }
+  // Keep plans on the phone's clock, and pull in teammates' tasks.
+  async function afterSignIn() {
+    const zone = deviceTimezone();
+    const { preferences } = get();
+    if (zone && preferences.timezone !== zone)
+      try {
+        await mutate([
+          {
+            kind: "preferences",
+            id: "singleton",
+            payload: { ...preferences, timezone: zone },
+          },
+        ]);
+      } catch {
+        /* The next sign-in or sync tries again. */
+      }
+    try {
+      await get().loadShares();
+    } catch {
+      /* Sharing is optional; the plan still works. */
+    }
   }
   return {
     ...empty(),
@@ -248,6 +359,7 @@ export const useTempo = create<State>((set, get) => {
           const data = decodeWorkspace(workspace);
           connection = { userId: user.id, token, base, epoch: ticket };
           set({ ...data, user, ready: true, booting: false, error: null });
+          void afterSignIn();
         } catch (e) {
           if (ticket !== epoch) return;
           if (e instanceof ApiError && e.status === 401)
@@ -293,6 +405,7 @@ export const useTempo = create<State>((set, get) => {
         epoch: ticket,
       };
       set({ ...data, user, ready: true, booting: false, error: null });
+      void afterSignIn();
     },
     signOut: async () => {
       const previous = connection;
@@ -309,7 +422,9 @@ export const useTempo = create<State>((set, get) => {
       await persistToken(null);
       if (previous)
         try {
-          await request(previous.base, "/v1/auth/logout", previous.token, {});
+          await request(previous.base, "/v1/auth/logout", previous.token, {
+            pushToken: devicePushToken,
+          });
         } catch {
           /* The local account stays locked even if the network is unavailable. */
         }
@@ -330,7 +445,17 @@ export const useTempo = create<State>((set, get) => {
       );
       set({ user: account(result.user) });
     },
-    cloudRequest: cloud,
+    cloudRequest: async <T>(path: string, body?: unknown) => {
+      const result = await cloud<T>(path, body);
+      if (body !== undefined && path.startsWith("/v1/team")) set({ undoEntry: null });
+      return result;
+    },
+    undo: async () => {
+      const entry = get().undoEntry;
+      if (!entry || entry.revision !== get().revision) throw new Error("Your workspace changed. The last edit can no longer be undone safely.");
+      await mutate(entry.changes, entry.revision, false);
+      set({ undoEntry: null });
+    },
     saveTasks: (tasks) =>
       mutate(
         tasks.map((payload) => ({ kind: "task", id: payload.id, payload })),
@@ -348,6 +473,17 @@ export const useTempo = create<State>((set, get) => {
           payload: { ...get().preferences, dayEnd },
         },
       ]),
+    saveReviewedPlan: (tasks, dayEnd, revision) => mutate([
+      ...tasks.map(payload => ({ kind: "task" as const, id: payload.id, payload })),
+      { kind: "preferences", id: "singleton", payload: { ...get().preferences, dayEnd } },
+    ], revision),
+    refreshRecurring: async () => {
+      const current = get();
+      if (!connection || current.pending) return;
+      const day = localParts(new Date(), current.preferences.timezone).date;
+      const occurrences = recurringOccurrences(current.tasks, day, current.preferences.timezone);
+      if (occurrences.length) await mutate(occurrences.slice(0, 1000).map(payload => ({ kind: "task", id: payload.id, payload })), current.revision, false);
+    },
     save: (kind, payload) =>
       mutate([
         {
@@ -359,7 +495,63 @@ export const useTempo = create<State>((set, get) => {
           payload,
         },
       ]),
-    remove: (kind, id) => mutate([{ kind, id, payload: null }]),
+    remove: (kind, id) => mutate([
+      ...(kind === "task" ? skipOccurrences(get().tasks, [id]).map(payload => ({ kind: "task" as const, id: payload.id, payload })) : []),
+      { kind, id, payload: null },
+    ]),
+    removeTasks: async (ids) => {
+      for (let i = 0; i < ids.length; i += 400)
+        await mutate(
+          [
+            ...skipOccurrences(get().tasks, ids.slice(i, i + 400)).map(payload => ({ kind: "task" as const, id: payload.id, payload })),
+            ...ids.slice(i, i + 400).map((id) => ({ kind: "task" as const, id, payload: null })),
+          ],
+        );
+    },
+    loadShares: async () => {
+      const active = connection;
+      const result = await cloud<Shares>("/v1/shares");
+      if (connection === active) set({ shares: result });
+    },
+    sync: async () => {
+      if (!connection || get().pending) return;
+      await Promise.all([get().reload(), get().loadShares()]);
+      const zone = deviceTimezone();
+      if (zone && get().preferences.timezone !== zone)
+        await get().save("preferences", { ...get().preferences, timezone: zone });
+      await get().refreshRecurring();
+    },
+    invite: async (taskId, email) => {
+      await cloud("/v1/shares", { taskId, email });
+      set({ undoEntry: null });
+      await get().loadShares();
+    },
+    respondShare: async (ownerId, taskId, accept) => {
+      await cloud("/v1/shares/respond", { ownerId, taskId, accept });
+      await get().loadShares();
+    },
+    removeShare: async (ownerId, taskId, memberId) => {
+      await cloud("/v1/shares/remove", { ownerId, taskId, memberId });
+      await get().loadShares();
+    },
+    setSharedDone: async (ownerId, taskId, done) => {
+      await cloud("/v1/shares/done", { ownerId, taskId, done });
+      // The owner's workspace revision moved; refresh it when it's ours.
+      if (ownerId === get().user?.id) await get().reload();
+      await get().loadShares();
+    },
+    // One atomic write: the server rejects tasks that point at a missing project.
+    removeProject: (id) =>
+      mutate([
+        ...get()
+          .tasks.filter((t) => t.projectId === id)
+          .map((t) => ({
+            kind: "task" as const,
+            id: t.id,
+            payload: { ...t, projectId: null },
+          })),
+        { kind: "project", id, payload: null },
+      ]),
   };
 });
 export function id() {

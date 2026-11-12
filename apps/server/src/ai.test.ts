@@ -46,3 +46,9 @@ test("truncated, malformed, empty and invalid AI plans never reach persistence",
       decodeAiContent({ content: [{ type: "text", text }] }, "task-extraction"),
     );
 });
+test("provider deadlines, priorities and named projects survive validation; impossible dates fail",()=>{
+  const item={...content.tasks[0],dueDay:"2026-10-24",priority:"high",project:"Launch"};
+  const decoded=decodeAiContent({content:[{type:"text",text:JSON.stringify({tasks:[item]})}]},"task-extraction");
+  assert.equal(decoded.tasks[0].dueDay,"2026-10-24");assert.equal(decoded.tasks[0].priority,"high");
+  for(const extra of [{dueDay:"2026-02-30"},{priority:"critical"},{project:42}]) assert.throws(()=>decodeAiContent({content:[{type:"text",text:JSON.stringify({tasks:[{...item,...extra}]})}]},"task-extraction"));
+});

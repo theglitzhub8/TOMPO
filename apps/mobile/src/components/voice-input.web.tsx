@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { View } from "react-native";
 import { useIsFocused } from "expo-router";
 import {
   ExpoSpeechRecognitionModule as speech,
   useSpeechRecognitionEvent,
 } from "expo-speech-recognition";
-import { Body, Button } from "./ui";
+import { VoiceOrb } from "./voice-orb";
 export function VoiceInput({
   value,
   onChange,
@@ -55,43 +54,41 @@ export function VoiceInput({
     if (!focused) speech.abort();
   }, [focused]);
   return (
-    <View style={{ gap: 10 }}>
-      <Button
-        disabled={disabled}
-        title={listening ? "■ Finish speaking" : "● Tell Tempo your day"}
-        onPress={async () => {
-          if (listening) {
-            speech.stop();
-            return;
-          }
-          setError("");
-          try {
-            if (!speech.isRecognitionAvailable())
-              throw new Error(
-                "Voice is unavailable in this browser. Use Chrome or type below.",
-              );
-            const p = await speech.requestPermissionsAsync();
-            if (!p.granted)
-              throw new Error("Allow microphone access, or type below.");
-            prefix.current = value.trim();
-            final.current = "";
-            speech.start({
-              lang: "en-US",
-              interimResults: true,
-              continuous: true,
-            });
-          } catch (e) {
-            setError(e instanceof Error ? e.message : "Could not start voice.");
-            onListening(false);
-          }
-        }}
-      />
-      <Body small>
-        {listening
-          ? "Listening… tap Finish speaking when you’re done."
-          : "Speak in one take, or type below. Your browser’s speech service may process audio online."}
-      </Body>
-      {!!error && <Body>{error}</Body>}
-    </View>
+    <VoiceOrb
+      listening={listening}
+      disabled={disabled}
+      error={error}
+      hint={
+        listening
+          ? "Speak naturally. Your words appear below as you talk."
+          : "Speak in one take, or type below. Your browser’s speech service may process audio online."
+      }
+      onPress={async () => {
+        if (listening) {
+          speech.stop();
+          return;
+        }
+        setError("");
+        try {
+          if (!speech.isRecognitionAvailable())
+            throw new Error(
+              "Voice is unavailable in this browser. Use Chrome or type below.",
+            );
+          const p = await speech.requestPermissionsAsync();
+          if (!p.granted)
+            throw new Error("Allow microphone access, or type below.");
+          prefix.current = value.trim();
+          final.current = "";
+          speech.start({
+            lang: "en-US",
+            interimResults: true,
+            continuous: true,
+          });
+        } catch (e) {
+          setError(e instanceof Error ? e.message : "Could not start voice.");
+          onListening(false);
+        }
+      }}
+    />
   );
 }

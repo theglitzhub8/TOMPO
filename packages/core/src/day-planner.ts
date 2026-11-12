@@ -1,4 +1,4 @@
-import { validClock, validate, type Task, type Routine } from "./model.ts";
+import { validDay, validClock, validate, type Task, type Routine } from "./model.ts";
 import { localInstant, localParts } from "./scheduling.ts";
 
 export type CaptureItem = {
@@ -6,6 +6,9 @@ export type CaptureItem = {
   duration: number;
   clock: string | null;
   steps: string[];
+  dueDay?: string;
+  priority?: "low" | "normal" | "high";
+  project?: string;
 };
 export type Capture = {
   items: CaptureItem[];
@@ -33,6 +36,9 @@ export function validateCapture(value: unknown): CaptureItem[] {
       typeof v.title !== "string" ||
       !v.title.trim() ||
       v.title.length > 200 ||
+      (v.dueDay !== undefined && v.dueDay !== null && !validDay(v.dueDay)) ||
+      (v.priority !== undefined && !["low", "normal", "high"].includes(String(v.priority))) ||
+      (v.project !== undefined && v.project !== null && (typeof v.project !== "string" || v.project.length > 200)) ||
       !Number.isInteger(v.duration) ||
       Number(v.duration) < 1 ||
       Number(v.duration) > 1440 ||
@@ -46,6 +52,9 @@ export function validateCapture(value: unknown): CaptureItem[] {
         "The planner returned an invalid task. Please try again.",
       );
     return {
+      ...(v.dueDay ? { dueDay: v.dueDay as string } : {}),
+      ...(v.priority ? { priority: v.priority as CaptureItem["priority"] } : {}),
+      ...(v.project ? { project: v.project as string } : {}),
       title: v.title.trim(),
       duration: Number(v.duration),
       clock: v.clock as string | null,
@@ -55,7 +64,7 @@ export function validateCapture(value: unknown): CaptureItem[] {
 }
 
 // A transparent offline fallback. Natural-language AI is used when connected.
-export function parseCapture(text: string): Capture {
+export function parseCapture(text: string, referenceDay?: string): Capture {
   if (!text.trim()) throw new Error("Tell Tempo what you need to do first.");
   if (text.length > 12000)
     throw new Error("Please keep one day’s capture under 12,000 characters.");
@@ -116,7 +125,25 @@ export function parseCapture(text: string): Capture {
       }
       clock = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
     }
+    const deadline = raw.match(/\b(?:due|by)\s+(\d{4}-\d{2}-\d{2}|tomorrow|today|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i);
+    let dueDay: string | undefined;
+    if (deadline) {
+      const value = deadline[1].toLowerCase();
+      if (validDay(value)) dueDay = value;
+      else if (referenceDay && validDay(referenceDay)) {
+        const weekdays = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+        const offset = value === "today" ? 0 : value === "tomorrow" ? 1 :
+          (weekdays.indexOf(value) - new Date(`${referenceDay}T12:00:00Z`).getUTCDay() + 7) % 7;
+        dueDay = new Date(Date.parse(`${referenceDay}T12:00:00Z`) + offset * 86400000).toISOString().slice(0, 10);
+      }
+      if (!dueDay) notes.push(`What date is “${deadline[1]}” for “${raw}”? Set its deadline before saving.`);
+    } else if (/\b(?:due|by)\s+/i.test(raw)) notes.push(`When is “${raw}” due? Add a deadline date in the task details.`);
+    const priority = /\burgent\b|high priority/i.test(raw) ? "high" as const : /low priority/i.test(raw) ? "low" as const : "normal" as const;
+    const project = raw.match(/\bfor project\s+([^,;]+?)(?=\s+(?:by|due|at|for \d)|$)/i);
     const title = raw
+      .replace(deadline?.[0] || /$^/, "")
+      .replace(project?.[0] || /$^/, "")
+      .replace(/\b(?:urgent|high priority|low priority)\b/gi, "")
       .replace(length?.[0] || /$^/, "")
       .replace(at?.[0] || /$^/, "")
       .replace(/^have\s+(?:a\s+)?/i, "")
@@ -139,6 +166,9 @@ export function parseCapture(text: string): Capture {
         : [];
     return {
       title: title[0].toUpperCase() + title.slice(1),
+      priority,
+      ...(dueDay ? { dueDay } : {}),
+      ...(project ? { project: project[1].trim() } : {}),
       duration,
       clock,
       steps,
@@ -168,6 +198,8 @@ export function captureTasks(
       fixed: !!item.clock,
       steps: item.steps,
       plannedDay: day,
+      ...(item.dueDay ? { dueDay: item.dueDay } : {}),
+      ...(item.priority ? { priority: item.priority } : {}),
     };
     validate("task", task);
     return task;
@@ -286,6 +318,8 @@ export function buildDay(
   }
   let cursor = start;
   const overflow: Task[] = [];
+  candidates.sort((a, b) => (a.dueDay || "9999").localeCompare(b.dueDay || "9999") ||
+    ({high: 0, normal: 1, low: 2}[a.priority || "normal"] - {high: 0, normal: 1, low: 2}[b.priority || "normal"]));
   for (const t of candidates) {
     let candidate = cursor;
     for (const b of occupied())

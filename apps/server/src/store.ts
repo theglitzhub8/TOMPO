@@ -14,8 +14,17 @@ export class WorkspaceConflict extends Error {
     );
   }
 }
+/** An owner edit to a task that teammates have joined. */
+export type SharedChange = {
+  ownerId: string;
+  taskId: string;
+  members: string[];
+  before: Record<string, unknown>;
+  after: Record<string, unknown> | null;
+};
 export class Store {
   readonly pool: Pool;
+  onSharedChange?: (changes: SharedChange[]) => void;
   constructor(url = process.env.DATABASE_URL) {
     if (!url) throw new Error("DATABASE_URL is required");
     this.pool = new Pool({
@@ -61,6 +70,21 @@ export class Store {
       client.release();
     }
   }
+  private async sharedTasks(client: PoolClient, userId: string, taskIds: string[]) {
+    if (!taskIds.length) return [];
+    const result = await client.query(`SELECT s.task_id, array_agg(DISTINCT s.member_id) AS members, min(e.payload::text)::jsonb AS payload
+               FROM (
+                 SELECT owner_id,task_id,member_id,status FROM task_shares WHERE status='accepted'
+                 UNION
+                 SELECT m.owner_id,t.entity_id AS task_id,m.member_id,m.status FROM project_members m
+                 JOIN entities t ON t.user_id=m.owner_id AND t.kind='task' AND t.payload->>'projectId'=m.project_id
+                 WHERE m.status='accepted'
+               ) s
+               JOIN entities e ON e.user_id=s.owner_id AND e.kind='task' AND e.entity_id=s.task_id
+              WHERE s.owner_id=$1 AND s.status='accepted' AND s.task_id = ANY($2::text[])
+              GROUP BY s.task_id`, [userId, taskIds]);
+    return result.rows as { task_id: string; members: string[]; payload: Record<string, unknown> }[];
+  }
   async saveWorkspace(userId: string, revision: number, raw: unknown) {
     if (!Number.isSafeInteger(revision) || revision < 0)
       throw new Error("Invalid workspace revision.");
@@ -75,6 +99,8 @@ export class Store {
       if (!user.rows[0]) throw new Error("Account unavailable");
       if (Number(user.rows[0].workspace_revision) !== revision)
         throw new WorkspaceConflict();
+      const taskIds = changes.filter((c) => c.kind === "task").map((c) => c.id);
+      const shared = await this.sharedTasks(client, userId, taskIds);
       for (const e of changes) {
         if (e.payload === null)
           await client.query(
@@ -95,6 +121,15 @@ export class Store {
         throw new Error(
           "A task refers to a project that is not in this account. Reassign it first.",
         );
+      // People stay on a task only while the owner still has it.
+      await client.query(
+        `DELETE FROM task_shares s WHERE s.owner_id=$1 AND NOT EXISTS (SELECT 1 FROM entities e WHERE e.user_id=s.owner_id AND e.kind='task' AND e.entity_id=s.task_id)`,
+        [userId],
+      );
+      await client.query(`DELETE FROM project_members m WHERE m.owner_id=$1 AND NOT EXISTS (SELECT 1 FROM entities e WHERE e.user_id=$1 AND e.kind='project' AND e.entity_id=m.project_id)`,[userId]);
+      await client.query(`DELETE FROM task_assignments a WHERE a.owner_id=$1 AND NOT EXISTS (SELECT 1 FROM entities e WHERE e.user_id=$1 AND e.kind='task' AND e.entity_id=a.task_id
+        AND (a.member_id=$1 OR EXISTS(SELECT 1 FROM project_members m WHERE m.owner_id=$1 AND m.project_id=e.payload->>'projectId' AND m.member_id=a.member_id AND m.status='accepted')))`,[userId]);
+      await client.query(`DELETE FROM task_comments c WHERE c.owner_id=$1 AND NOT EXISTS (SELECT 1 FROM entities e WHERE e.user_id=$1 AND e.kind='task' AND e.entity_id=c.task_id)`,[userId]);
       const count = await client.query(
         "SELECT count(*)::int AS total FROM entities WHERE user_id=$1",
         [userId],
@@ -106,7 +141,21 @@ export class Store {
         [userId],
       );
       const result = await this.read(client, userId);
+      const currentShares = await this.sharedTasks(client, userId, taskIds);
+      const notifications: SharedChange[] = [];
+      for (const taskId of taskIds) {
+        const before = shared.find(s => s.task_id === taskId);
+        const after = currentShares.find(s => s.task_id === taskId);
+        const prior = before?.members ?? [], current = after?.members ?? [];
+        const lost = prior.filter(id => !current.includes(id));
+        const retained = prior.filter(id => current.includes(id));
+        const added = current.filter(id => !prior.includes(id));
+        if (lost.length) notifications.push({ ownerId: userId, taskId, members: lost, before: before!.payload, after: null });
+        if (retained.length) notifications.push({ ownerId: userId, taskId, members: retained, before: before!.payload, after: after!.payload });
+        if (added.length) notifications.push({ ownerId: userId, taskId, members: added, before: {}, after: after!.payload });
+      }
       await client.query("COMMIT");
+      if (notifications.length && this.onSharedChange) this.onSharedChange(notifications);
       return result;
     } catch (e) {
       await client.query("ROLLBACK");

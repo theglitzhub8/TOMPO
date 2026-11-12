@@ -2,7 +2,15 @@
 
 **Sign up → speak or type everything you need to do → get a realistic day plan → follow one next step.**
 
-Tempo includes one-take voice/text capture, AI task breakdown, fixed appointments, protected routines, breaks, overflow, completion, and replanning. The main app has Today, Tell Tempo, and Settings. The new brand kit lives in `apps/mobile/assets/brand`.
+Tempo includes one-take voice/text capture, AI task breakdown, fixed appointments, protected routines, breaks, overflow, completion, and replanning. The main app has Today, Projects, Tell Tempo, Tasks, and Settings. The new brand kit lives in `apps/mobile/assets/brand`.
+
+## Day changes, repeats, and wrap-up
+
+- **Today → My day changed:** choose when you’re available and when you want to finish, preview every moved task and waiting count, then save. Fixed appointments, accepted shared work, and completed tasks stay in place. A changed workspace requires another review.
+- **Tasks → add/edit → Repeat:** choose Daily, Weekdays, or Weekly. Tempo prepares separate occurrences for the coming seven days when Today opens and during foreground sync. Flexible repeats wait for planning; timed repeats keep their local clock time. Completion belongs to each occurrence. Delete an occurrence to skip that date. Edit the original task to change or stop future generation; already created occurrences remain editable tasks. Generation runs while the app is open, not on a background server timer.
+- **Today → wrap-up:** review this day or the previous day, see completed task counts and estimated minutes, and select unfinished flexible tasks to carry to the next day. Appointments and recurring occurrences are handled separately. Carry-forward history keeps the original day’s summary accurate; moving a task does not mark it completed or immediately schedule it.
+
+See `docs/DAY_LIFECYCLE.md` for the initial upgrades and `docs/PRODUCT_UPGRADES.md` for weekly planning, collaboration, calendar, widget, recovery, and verification details.
 
 ## Accounts and online storage
 
@@ -54,12 +62,13 @@ Set `ANTHROPIC_API_KEY` on the backend to enable AI extraction. If the provider 
 
 App icon, favicon, Android adaptive/themed icon, and splash configuration use the new brand assets. Native icon/splash changes need a fresh build. `apps/mobile/assets/brand/README.md` documents palette, usage, and the generation prompt set.
 
-Source changes do not deploy the hosted backend or replace an installed phone app. Background reminders, password-reset email, and email verification are not connected.
+Source changes do not deploy the hosted backend or replace an installed phone app. Native reminders and shared-task push delivery have source integrations that still need physical-device verification. Password recovery is implemented and requires a configured Resend sender; email verification is not connected.
 
 ## Verify
 
 ```sh
 npm test
+npm run test:mobile-store
 npm run typecheck
 npm run lint
 npm --prefix apps/server test

@@ -3,9 +3,13 @@ import {
   type IncomingMessage,
   type ServerResponse,
 } from "node:http";
+import { Collaboration, TeamError } from "./collaboration.js";
+import { Recovery, type ResetMailer } from "./recovery.js";
 import { Auth } from "./auth.js";
 import { Store, WorkspaceConflict } from "./store.js";
 import { PlanningLimit, planCapture } from "./planning.js";
+import { ShareError, Shares } from "./shares.js";
+import { Push, expoSender, type PushSender } from "./push.js";
 
 async function body(req: IncomingMessage) {
   const buffers: Buffer[] = [];
@@ -18,10 +22,67 @@ async function body(req: IncomingMessage) {
   }
   return JSON.parse(Buffer.concat(buffers).toString("utf8") || "{}");
 }
-export function createTempoServer(store: Store) {
+export function createTempoServer(
+  store: Store,
+  options: { sendPush?: PushSender | null; sendReset?: ResetMailer } = {},
+) {
   const auth = new Auth(store.pool);
   const authLimits = new Map<string, { count: number; until: number }>();
   const planningLimit = new PlanningLimit();
+  const push = new Push(
+    store.pool,
+    options.sendPush === undefined ? expoSender : options.sendPush,
+  );
+  const shares = new Shares(store.pool, push);
+  const team = new Collaboration(store.pool, push);
+  const recovery = new Recovery(store.pool, options.sendReset);
+  store.onSharedChange = (changes) => {
+    void (async () => {
+      const names = await store.pool.query(
+        "SELECT display_name AS name FROM users WHERE id=$1",
+        [changes[0].ownerId],
+      );
+      const who = String(names.rows[0]?.name ?? "Your teammate").split(/\s+/)[0];
+      for (const c of changes) {
+        const title = String(c.before.title ?? "A shared task");
+        if (!Object.keys(c.before).length && c.after) {
+          await push.notify(c.members, `${who} added shared work`, String(c.after.title), { type: "changed", ownerId: c.ownerId, taskId: c.taskId, projectId: c.after.projectId });
+          continue;
+        }
+        const data = { type: "changed", ownerId: c.ownerId, taskId: c.taskId, projectId: c.after?.projectId ?? c.before.projectId };
+        if (!c.after) {
+          await push.notify(c.members, `${who} removed a shared task`, `${title} is no longer on your day.`, data);
+          continue;
+        }
+        if (c.after.status !== c.before.status)
+          await push.notify(
+            c.members,
+            c.after.status === "completed" ? `${who} finished a shared task` : `${who} reopened a shared task`,
+            `${title}${c.after.status === "completed" ? " is done." : " is back on the list."}`,
+            data,
+          );
+        if (c.after.scheduledAt !== c.before.scheduledAt)
+          await push.notify(
+            c.members,
+            `${who} moved a shared task`,
+            async (user) => `${String(c.after!.title)} is now ${await push.when(user, c.after!.scheduledAt)}.`,
+            data,
+          );
+        else if (c.after.title !== c.before.title || c.after.duration !== c.before.duration)
+          await push.notify(c.members, `${who} updated a shared task`, `${String(c.after.title)} · ${String(c.after.duration)} min.`, data);
+      }
+    })().catch(() => undefined);
+  };
+  // Invites look accounts up by email, so cap how fast one account can try.
+  const inviteLimits = new Map<string, { count: number; until: number }>();
+  const allowInvite = (user: string) => {
+    const now = Date.now();
+    for (const [k, v] of inviteLimits) if (v.until <= now) inviteLimits.delete(k);
+    const limit = inviteLimits.get(user) || { count: 0, until: now + 600000 };
+    limit.count++;
+    inviteLimits.set(user, limit);
+    return limit.count <= 30;
+  };
   const json = (res: ServerResponse, status: number, data: unknown) => {
     res.writeHead(status, {
       "content-type": "application/json",
@@ -67,7 +128,7 @@ export function createTempoServer(store: Store) {
         });
       if (
         req.method === "POST" &&
-        ["/v1/auth/register", "/v1/auth/login"].includes(url.pathname)
+        ["/v1/auth/register", "/v1/auth/login", "/v1/auth/forgot", "/v1/auth/reset"].includes(url.pathname)
       ) {
         const now = Date.now(),
           ip = req.socket.remoteAddress || "unknown";
@@ -87,6 +148,10 @@ export function createTempoServer(store: Store) {
           input = await body(req);
         } catch {
           return json(res, 400, { error: "Invalid account request." });
+        }
+        if (url.pathname.endsWith("forgot") || url.pathname.endsWith("reset")) {
+          try { return json(res, 200, await (url.pathname.endsWith("forgot") ? recovery.request(input) : recovery.reset(input))); }
+          catch(e) { return json(res, 400, { error: e instanceof Error ? e.message : "Could not recover this account." }); }
         }
         try {
           return json(
@@ -118,6 +183,9 @@ export function createTempoServer(store: Store) {
       if (req.method === "GET" && url.pathname === "/v1/auth/me")
         return json(res, 200, { user: account });
       if (req.method === "POST" && url.pathname === "/v1/auth/logout") {
+        // Stop sending this account's notifications to the device that signed out.
+        const input = await body(req).catch(() => ({}));
+        await push.unregister(account.id, input.pushToken);
         await auth.logout(token);
         return json(res, 200, { ok: true });
       }
@@ -156,6 +224,75 @@ export function createTempoServer(store: Store) {
             error: e instanceof Error ? e.message : "Could not save your plan.",
           });
         }
+      }
+      if (req.method === "POST" && url.pathname === "/v1/push/register") {
+        try {
+          return json(res, 200, await push.register(account.id, await body(req)));
+        } catch {
+          return json(res, 400, { error: "Could not register this device for notifications." });
+        }
+      }
+      if (req.method === "GET" && url.pathname === "/v1/shares")
+        return json(res, 200, await shares.list(account.id));
+      if (req.method === "POST" && url.pathname.startsWith("/v1/shares")) {
+        const action = url.pathname.slice("/v1/shares".length);
+        if (!["", "/respond", "/remove", "/done"].includes(action))
+          return json(res, 404, { error: "Not found" });
+        if (action === "" && !allowInvite(account.id))
+          return json(res, 429, {
+            error: "You’ve added a lot of people recently. Try again in a few minutes.",
+          });
+        let input;
+        try {
+          input = await body(req);
+        } catch {
+          return json(res, 400, { error: "Invalid sharing request." });
+        }
+        try {
+          const result =
+            action === ""
+              ? await shares.invite(account.id, input)
+              : action === "/respond"
+                ? await shares.respond(account.id, input)
+                : action === "/remove"
+                  ? await shares.remove(account.id, input)
+                  : await shares.setDone(account.id, input);
+          return json(res, 200, result);
+        } catch (e) {
+          if (e instanceof ShareError) return json(res, 400, { error: e.message });
+          throw e;
+        }
+      }
+      if (url.pathname.startsWith("/v1/team")) {
+        try {
+          if(req.method === "GET") {
+            if(url.pathname === "/v1/team") return json(res,200,await team.list(account.id));
+            if(url.pathname === "/v1/team/planning") return json(res,200,await team.planning(account.id));
+            const owner=url.searchParams.get("owner") || "", record=url.searchParams.get("id") || "";
+            if(!/^[a-f0-9-]{36}$/i.test(owner) || !/^[a-zA-Z0-9][a-zA-Z0-9:_-]{0,199}$/.test(record)) return json(res,400,{error:"Choose a valid record."});
+            if(url.pathname === "/v1/team/project") return json(res,200,await team.detail(account.id,owner,record));
+            if(url.pathname === "/v1/team/comments") return json(res,200,await team.comments(account.id,owner,record));
+          }
+          if(req.method === "POST") {
+            if(!allowInvite(account.id)) return json(res,429,{error:"Too many updates. Try again in a few minutes."});
+            const input=await body(req);
+            const actions: Record<string, (user:string,input:any)=>Promise<unknown>> = {
+              "/v1/team/invite":team.invite.bind(team), "/v1/team/respond":team.respond.bind(team),
+              "/v1/team/remove":team.remove.bind(team), "/v1/team/assign":team.assign.bind(team),
+              "/v1/team/done":team.done.bind(team), "/v1/team/comments":team.comment.bind(team), "/v1/team/busy":team.busy.bind(team),
+            };
+            if(actions[url.pathname]) return json(res,200,await actions[url.pathname](account.id,input));
+          }
+          return json(res,404,{error:"Not found"});
+        } catch(e) { if(e instanceof TeamError) return json(res,400,{error:e.message}); throw e; }
+      }
+      if(req.method === "GET" && url.pathname === "/v1/inbox") {
+        const r=await store.pool.query("SELECT id::text,title,message,data,created_at AS at,read_at AS read FROM activities WHERE user_id=$1 ORDER BY created_at DESC LIMIT 100",[account.id]);
+        return json(res,200,{items:r.rows});
+      }
+      if(req.method === "POST" && url.pathname === "/v1/inbox/read") {
+        await store.pool.query("UPDATE activities SET read_at=now() WHERE user_id=$1 AND read_at IS NULL",[account.id]);
+        return json(res,200,{ok:true});
       }
       if (req.method === "GET" && url.pathname === "/v1/connection")
         return json(res, 200, {

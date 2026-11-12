@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { AppState, View } from "react-native";
+import { AppState } from "react-native";
 import { useIsFocused } from "expo-router";
 import { requireOptionalNativeModule } from "expo";
 import type { ExpoSpeechRecognitionModuleType } from "expo-speech-recognition/build/ExpoSpeechRecognitionModule.types";
-import { Body, Button } from "./ui";
+import { VoiceOrb } from "./voice-orb";
 
 const speech = requireOptionalNativeModule<ExpoSpeechRecognitionModuleType>(
   "ExpoSpeechRecognition",
@@ -77,66 +77,59 @@ export function VoiceInput({
     if (!focused) speech?.abort();
   }, [focused]);
   return (
-    <View style={{ gap: 10 }}>
-      <Button
-        disabled={disabled || starting}
-        title={
-          listening
-            ? "■ Finish speaking"
-            : starting
-              ? "Opening microphone…"
-              : "● Tell Tempo your day"
+    <VoiceOrb
+      listening={listening}
+      starting={starting}
+      disabled={disabled}
+      error={error}
+      hint={
+        listening
+          ? "Speak naturally. Your words appear below as you talk."
+          : "Speak in one take, or type below. Speech recognition uses your device’s speech service and may need internet."
+      }
+      onPress={async () => {
+        if (!speech) {
+          setError(
+            "Voice isn’t included in this version of the app (for example, Expo Go). Install the latest Tempo app, or use your keyboard’s microphone to dictate here.",
+          );
+          return;
         }
-        onPress={async () => {
-          if (!speech) {
-            setError(
-              "Voice needs the latest Tempo development build. You can also use your keyboard’s microphone to dictate here.",
+        if (listening) {
+          speech.stop();
+          return;
+        }
+        setError("");
+        setStarting(true);
+        callbacks.current.onListening(true);
+        try {
+          if (!speech.isRecognitionAvailable())
+            throw new Error(
+              "Speech recognition is unavailable on this device. Try keyboard dictation or type below.",
             );
-            return;
-          }
-          if (listening) {
-            speech.stop();
-            return;
-          }
-          setError("");
-          setStarting(true);
-          callbacks.current.onListening(true);
-          try {
-            if (!speech.isRecognitionAvailable())
-              throw new Error(
-                "Speech recognition is unavailable on this device. Try keyboard dictation or type below.",
-              );
-            const permission = await speech.requestPermissionsAsync();
-            if (!permission.granted)
-              throw new Error(
-                "Allow microphone and speech recognition in Settings, or type below.",
-              );
-            prefix.current = value.trim();
-            final.current = "";
-            speech.start({
-              lang: "en-US",
-              interimResults: true,
-              continuous: true,
-              addsPunctuation: true,
-              iosTaskHint: "dictation",
-            });
-          } catch (e) {
-            setError(
-              e instanceof Error
-                ? e.message
-                : "Could not start voice. Try typing below.",
+          const permission = await speech.requestPermissionsAsync();
+          if (!permission.granted)
+            throw new Error(
+              "Allow microphone and speech recognition in Settings, or type below.",
             );
-            setStarting(false);
-            callbacks.current.onListening(false);
-          }
-        }}
-      />
-      <Body small>
-        {listening
-          ? "Listening… speak naturally. Tap Finish speaking when you’re done."
-          : "Speak in one take, or type below. Speech recognition uses your device’s speech service and may need internet."}
-      </Body>
-      {!!error && <Body>{error}</Body>}
-    </View>
+          prefix.current = value.trim();
+          final.current = "";
+          speech.start({
+            lang: "en-US",
+            interimResults: true,
+            continuous: true,
+            addsPunctuation: true,
+            iosTaskHint: "dictation",
+          });
+        } catch (e) {
+          setError(
+            e instanceof Error
+              ? e.message
+              : "Could not start voice. Try typing below.",
+          );
+          setStarting(false);
+          callbacks.current.onListening(false);
+        }
+      }}
+    />
   );
 }

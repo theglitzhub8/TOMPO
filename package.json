@@ -8,6 +8,7 @@
     "lint": "npm --prefix apps/mobile run lint",
     "server:dev": "npm --prefix apps/server run dev",
     "server:build": "npm --prefix apps/server run build",
-    "server:start": "npm --prefix apps/server start"
+    "server:start": "npm --prefix apps/server start",
+    "test:mobile-store": "node --experimental-strip-types --test apps/mobile/tests/store.test.mjs"
   }
 }
