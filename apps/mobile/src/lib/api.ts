@@ -43,7 +43,8 @@ export async function request<T>(
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-      signal: AbortSignal.timeout(path === "/v1/plan" ? 30000 : 15000),
+      // AI requests can take over a minute on long descriptions.
+      signal: AbortSignal.timeout(path === "/v1/plan" || path === "/v1/assistant" ? 90000 : 15000),
     });
   } catch {
     throw new Error(

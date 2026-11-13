@@ -10,5 +10,8 @@
     "server:build": "npm --prefix apps/server run build",
     "server:start": "npm --prefix apps/server start",
     "test:mobile-store": "node --experimental-strip-types --test apps/mobile/tests/store.test.mjs"
+  },
+  "dependencies": {
+    "expo": "^58.0.25"
   }
 }

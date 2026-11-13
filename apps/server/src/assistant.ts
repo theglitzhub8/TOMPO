@@ -203,7 +203,7 @@ Return JSON only: {"reply":string,"actions":Action[],"listen":boolean}.
   {"type":"add","title":string,"duration":minutes,"day":"YYYY-MM-DD"|null,"clock":"HH:mm"|null,"priority":"low"|"normal"|"high","project":string|null,"steps":string[]}
   {"type":"update","id":string,"title"?:string,"duration"?:minutes,"day"?:"YYYY-MM-DD","clock"?:"HH:mm"|null,"priority"?:"low"|"normal"|"high"}
   {"type":"complete","id":string} {"type":"reopen","id":string} {"type":"delete","id":string} {"type":"replan"}
-Use clock only for a specific time the person asked for; null makes the task flexible. Use day for the date it should happen. Estimate realistic durations when not given. Use "replan" when they want the rest of today rearranged. Only use ids from the task list. Do not invent commitments. Never delete or move fixed appointments unless explicitly asked. Propose no actions when they only want advice.${checkin}
+Add one task per activity the person mentions, in order, with exactly the durations they state. Set clock whenever they state or imply a start time: explicit times give that start, and sequences chain ("wake at 12, exercise 30 minutes, then clean 30 minutes" gives exercise 12:00, clean 12:30). null makes the task flexible; never invent a time. Use day for the date it should happen. Estimate realistic durations when not given. Use "replan" when they want the rest of today rearranged. Only use ids from the task list. Do not invent commitments. Never delete or move fixed appointments unless explicitly asked. Propose no actions when they only want advice.${checkin}
 Tasks (start is local time, null when flexible): ${JSON.stringify(input.tasks)}`;
 }
 

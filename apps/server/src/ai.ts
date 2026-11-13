@@ -7,7 +7,16 @@ export type AiSection =
   | "performance-review";
 const schemas: Record<AiSection, string> = {
   "task-extraction":
-    'Turn one natural-language brain dump into distinct actionable tasks, retaining every commitment. Return {"tasks":[{"title":string,"duration":integer,"clock":string|null,"steps":string[],"dueDay":string|null,"priority":"low"|"normal"|"high","project":string|null}],"notes":string[]}. Titles max 200 characters, duration 1–1440 minutes, clock HH:mm ONLY for explicit fixed appointment times; otherwise null. Estimate realistic lengths when omitted. Add 2–5 concrete steps only for complex work; simple chores need no steps. Order flexible tasks by stated priority while preserving dependencies. Keep the user’s language. Do not invent commitments. Mention ambiguous times, deadlines and assumptions in notes. Never interpret deadlines as fixed start times. Resolve explicit deadlines to YYYY-MM-DD using the supplied day and timezone; otherwise dueDay null. Priority normal unless explicitly urgent/high or low. Project only when named by the user. Ask short clarification questions in notes for ambiguous commitments; keep assumptions visible. No more than 60 tasks.',
+    'Turn one natural-language description of the person\'s day into precise, distinct tasks. Return {"tasks":[{"title":string,"duration":integer,"clock":string|null,"steps":string[],"dueDay":string|null,"priority":"low"|"normal"|"high","project":string|null}],"notes":string[]}. ' +
+    "Rules, in order of importance: " +
+    "(1) Capture every activity the person mentions, including personal ones like sleeping, exercise, cleaning and cooking, as its own task, in the order they will happen. Never drop, merge or invent activities. " +
+    "(2) Durations: use exactly the length the person states. If an activity runs between two stated times (sleep at 10:00, wake up at 12:00), the duration is the difference (120). Estimate realistic lengths only when nothing is stated. " +
+    "(3) Start times (clock, 24-hour HH:mm): set clock whenever the person states or implies when something happens. Explicit times (\"at 2pm\", \"by 10am I want to be sleeping\") give that start. Sequences (\"when I wake up at 12, exercise for 30 minutes, then clean for 30 minutes, then cook\") chain: each task starts when the previous one ends (exercise 12:00, clean 12:30, cook 13:00). A wake-up time is the moment sleep ends and the next activity begins; do not make a separate wake-up task unless the person asks for a reminder. Use null only for tasks with no timing at all, and never invent a time for those. " +
+    "(4) Read times as the person means them: use context for am/pm, and mention any guess in notes. " +
+    "(5) Titles: short, clean imperative phrases in the person\'s language with speech-recognition mistakes corrected (\"Exercise\", \"Clean the house\", \"Prepare food\"); max 200 characters. " +
+    "(6) Add 2–5 concrete steps only for complex work; simple activities get none. " +
+    "(7) dueDay only for an explicit deadline on another day, resolved to YYYY-MM-DD from the supplied day and timezone; a deadline is never a start time. Priority normal unless the person says urgent or important, low if they say it can wait. Project only when the person names one. " +
+    "(8) Put short questions about anything genuinely ambiguous in notes. No more than 60 tasks.",
   "priority-ranking":
     'Return {"items":[{"id":string,"priority":number,"reason":string}]}',
   "daily-plan":
@@ -54,7 +63,7 @@ export async function chatJson(
         "content-type": "application/json",
         authorization: `Bearer ${process.env.MOONSHOT_API_KEY}`,
       },
-      signal: AbortSignal.timeout(45000),
+      signal: AbortSignal.timeout(85000),
       body: JSON.stringify({
         model: process.env.MOONSHOT_MODEL || "kimi-k3.1-pro",
         max_tokens: maxTokens,
