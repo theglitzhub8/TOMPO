@@ -40,6 +40,7 @@ export default function Today() {
   const [now, setNow] = useState(new Date());
   const [message, setMessage] = useState("");
   const [adjusting, setAdjusting] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
   const [recurrenceError, setRecurrenceError] = useState("");
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 30000);
@@ -327,6 +328,41 @@ export default function Today() {
           </Reveal>
           {adjusting && <DayAdjustment key={day} day={day} onClose={() => setAdjusting(false)} />}
           {!!message && <Notice tone="mint">{message}</Notice>}
+          {!!today.length &&
+            (confirmClear ? (
+              <View style={{ gap: 10, padding: 14, borderRadius: 16, backgroundColor: theme.dangerSoft }}>
+                <Text style={{ fontFamily: theme.fonts.medium, fontSize: 13.5, lineHeight: 20, color: theme.danger }}>
+                  Delete all {today.length} {today.length === 1 ? "task" : "tasks"} on this day, done or not? This
+                  can’t be undone. Repeating tasks only skip this day.
+                </Text>
+                <View style={{ flexDirection: "row", gap: 10 }}>
+                  <Button title="Keep them" variant="light" compact style={{ flex: 1 }} onPress={() => setConfirmClear(false)} />
+                  <Action
+                    title="Delete all"
+                    busyTitle="Deleting…"
+                    icon="delete"
+                    compact
+                    style={{ flex: 1 }}
+                    run={async () => {
+                      await useTempo.getState().removeTasks(today.map((t) => t.id));
+                      setConfirmClear(false);
+                      setMessage("Day cleared. Tell Tempo your new plan whenever you’re ready.");
+                    }}
+                  />
+                </View>
+              </View>
+            ) : (
+              <Button
+                title="Clear this day"
+                icon="delete"
+                variant="ghost"
+                compact
+                onPress={() => {
+                  setMessage("");
+                  setConfirmClear(true);
+                }}
+              />
+            ))}
           {!!missed.length && (
             <Card>
               <SectionHeader
