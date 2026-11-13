@@ -19,25 +19,58 @@ const schemas: Record<AiSection, string> = {
     'Return {"summary":string,"wins":string[],"focusNext":string}',
 };
 
-export function decodeAiContent(
-  data: { stop_reason?: string; content?: { type: string; text?: string }[] },
-  section: AiSection,
-) {
-  if (data.stop_reason === "max_tokens")
+// Moonshot (Kimi) speaks the OpenAI chat-completions format.
+export type ChatCompletion = {
+  choices?: { finish_reason?: string; message?: { content?: string | null } }[];
+};
+export const aiConfigured = () => !!process.env.MOONSHOT_API_KEY;
+
+/** Parses the JSON object in a chat completion, rejecting truncated replies. */
+export function completionJson(data: ChatCompletion) {
+  const choice = data.choices?.[0];
+  if (choice?.finish_reason === "length")
     throw new Error("AI response was incomplete");
-  const text = data.content
-    ?.filter((x) => x.type === "text")
-    .map((x) => x.text || "")
-    .join("\n")
+  const text = (choice?.message?.content || "")
     .trim()
     .replace(/^```(?:json)?\s*/i, "")
     .replace(/\s*```$/, "");
-  let content;
   try {
-    content = JSON.parse(text || "");
+    return JSON.parse(text);
   } catch {
     throw new Error("AI returned invalid JSON");
   }
+}
+
+export async function chatJson(
+  system: string,
+  messages: { role: "user" | "assistant"; content: string }[],
+  maxTokens = 6000,
+) {
+  const response = await fetch(
+    `${(process.env.MOONSHOT_BASE_URL || "https://api.moonshot.ai/v1").replace(/\/$/, "")}/chat/completions`,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${process.env.MOONSHOT_API_KEY}`,
+      },
+      signal: AbortSignal.timeout(45000),
+      body: JSON.stringify({
+        model: process.env.MOONSHOT_MODEL || "kimi-k3.1-pro",
+        max_tokens: maxTokens,
+        response_format: { type: "json_object" },
+        messages: [{ role: "system", content: system }, ...messages],
+      }),
+    },
+  );
+  if (!response.ok) throw new Error(`AI provider error ${response.status}`);
+  return completionJson((await response.json()) as ChatCompletion);
+}
+
+export const decodeAiContent = (data: ChatCompletion, section: AiSection) =>
+  validateAiContent(completionJson(data), section);
+
+export function validateAiContent(content: any, section: AiSection) {
   if (section === "task-extraction") {
     if (
       !content ||
@@ -74,35 +107,22 @@ export function decodeAiContent(
   return content;
 }
 
-export async function askClaude(section: AiSection, input: unknown) {
-  const key = process.env.ANTHROPIC_API_KEY;
-  if (!key)
+export async function askAi(section: AiSection, input: unknown) {
+  if (!aiConfigured())
     return {
       simulation: true,
       section,
       content: localFallback(section, input),
       requiresConfirmation: true,
     };
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-api-key": key,
-      "anthropic-version": "2023-06-01",
-    },
-    signal: AbortSignal.timeout(25000),
-    body: JSON.stringify({
-      model: process.env.ANTHROPIC_MODEL || "claude-haiku-4-5-20251001",
-      max_tokens: 6000,
-      system: `You are Tempo, a helpful day planner. ${schemas[section]} Never modify protected routines or confirmed appointments without explicit permission. Return JSON only, without markdown fences.`,
-      messages: [{ role: "user", content: JSON.stringify(input) }],
-    }),
-  });
-  if (!response.ok) throw new Error(`AI provider error ${response.status}`);
+  const content = await chatJson(
+    `You are Tempo, a helpful day planner. ${schemas[section]} Never modify protected routines or confirmed appointments without explicit permission. Return JSON only, without markdown fences.`,
+    [{ role: "user", content: JSON.stringify(input) }],
+  );
   return {
     simulation: false,
     section,
-    content: decodeAiContent(await response.json(), section),
+    content: validateAiContent(content, section),
     requiresConfirmation: true,
   };
 }

@@ -204,6 +204,8 @@ type State = {
   signOut: () => Promise<void>;
   updateName: (name: string) => Promise<void>;
   saveTasks: (tasks: Task[]) => Promise<void>;
+  /** Saves confirmed assistant changes as one revision. */
+  applyChanges: (tasks: Task[], removedIds: string[], projects: Project[]) => Promise<void>;
   savePlan: (tasks: Task[], dayEnd: string) => Promise<void>;
   saveReviewedPlan: (tasks: Task[], dayEnd: string, revision: number) => Promise<void>;
   refreshRecurring: () => Promise<void>;
@@ -487,6 +489,13 @@ export const useTempo = create<State>((set, get) => {
       mutate(
         tasks.map((payload) => ({ kind: "task", id: payload.id, payload })),
       ),
+    applyChanges: (tasks, removedIds, projects) =>
+      mutate([
+        ...projects.map((payload) => ({ kind: "project" as const, id: payload.id, payload })),
+        ...tasks.map((payload) => ({ kind: "task" as const, id: payload.id, payload })),
+        ...skipOccurrences(get().tasks, removedIds).map((payload) => ({ kind: "task" as const, id: payload.id, payload })),
+        ...removedIds.map((id) => ({ kind: "task" as const, id, payload: null })),
+      ]),
     savePlan: (tasks, dayEnd) =>
       mutate([
         ...tasks.map((payload) => ({

@@ -9,6 +9,8 @@ import { Auth } from "./auth.js";
 import { HafrikError, HafrikLogin, type HafrikFetch } from "./hafrik.js";
 import { Store, WorkspaceConflict } from "./store.js";
 import { PlanningLimit, planCapture } from "./planning.js";
+import { aiConfigured } from "./ai.js";
+import { askAssistant } from "./assistant.js";
 import { ShareError, Shares } from "./shares.js";
 import { Push, expoSender, type PushSender } from "./push.js";
 
@@ -30,6 +32,7 @@ export function createTempoServer(
   const auth = new Auth(store.pool);
   const authLimits = new Map<string, { count: number; until: number }>();
   const planningLimit = new PlanningLimit();
+  const assistantLimit = new PlanningLimit(120);
   const push = new Push(
     store.pool,
     options.sendPush === undefined ? expoSender : options.sendPush,
@@ -335,10 +338,32 @@ export function createTempoServer(
         return json(res, 200, {
           connected: true,
           database: true,
-          aiConfigured: !!process.env.ANTHROPIC_API_KEY,
+          aiConfigured: aiConfigured(),
           cloudStorage: true,
           account,
         });
+      if (req.method === "POST" && url.pathname === "/v1/assistant") {
+        if (!assistantLimit.allow(account.id))
+          return json(res, 429, {
+            error: "You’ve talked with Tempo a lot this hour. Try again a little later.",
+          });
+        let input;
+        try {
+          input = await body(req);
+        } catch {
+          return json(res, 400, { error: "Check your message and try again." });
+        }
+        try {
+          return json(res, 200, await askAssistant(input));
+        } catch (e) {
+          return json(res, e instanceof Error && e.message.startsWith("Check") ? 400 : 502, {
+            error:
+              e instanceof Error && e.message.startsWith("Check")
+                ? e.message
+                : "Tempo’s assistant couldn’t answer just now. Try again.",
+          });
+        }
+      }
       if (req.method === "POST" && url.pathname === "/v1/plan") {
         if (!planningLimit.allow(account.id))
           return json(res, 429, {

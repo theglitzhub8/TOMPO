@@ -12,6 +12,12 @@ Tempo includes one-take voice/text capture, AI task breakdown, fixed appointment
 
 See `docs/DAY_LIFECYCLE.md` for the initial upgrades and `docs/PRODUCT_UPGRADES.md` for weekly planning, collaboration, calendar, widget, recovery, and verification details.
 
+## Talk to Tempo
+
+**Today → Talk to Tempo** opens a voice assistant backed by Moonshot Kimi (`POST /v1/assistant`). Speak or type; when you stop talking it sends your words with a snapshot of your own tasks. Tempo replies in one to three sentences, read aloud unless voice replies are turned off, and may suggest changes: add, rename, retime, move, complete, reopen or delete tasks, or rearrange the rest of today. Suggestions appear as a list and nothing changes until you tap **Apply changes**, which saves them in one revision. The server discards suggestions that refer to tasks you don't own or have invalid times. It also corrects likely speech-recognition mistakes and writes clean task titles.
+
+Tapping a task reminder (not its action buttons) opens a check-in: Tempo asks how the task went and suggests marking it done, adding time, or moving it.
+
 ## Accounts and online storage
 
 An account is required before any planner screen can open, including deep links. The API independently enforces sign-in for planning, profiles, and workspace access.
@@ -60,7 +66,7 @@ Open `http://localhost:8084`. The local preview proxy forwards `/v1/` account/AP
 
 Voice uses `expo-speech-recognition` with microphone/speech permissions and a visible listening state. It requires a rebuilt native app. Speech-service availability, network needs, and session limits vary by device; typing and keyboard dictation remain available. Tempo does not save audio recordings.
 
-Set `ANTHROPIC_API_KEY` on the backend to enable AI extraction. If the provider is unavailable, authenticated users can review a clearly labeled local fallback plan. It recognizes common English lists and explicit appointment times; it does not replace full natural-language AI understanding.
+Set `MOONSHOT_API_KEY` (and optionally `MOONSHOT_MODEL`, default `kimi-k3.1-pro`) on the backend to enable AI extraction and the voice assistant. If the provider is unavailable, authenticated users can review a clearly labeled local fallback plan. It recognizes common English lists and explicit appointment times; it does not replace full natural-language AI understanding.
 
 App icon, favicon, Android adaptive/themed icon, and splash configuration use the new brand assets. Native icon/splash changes need a fresh build. `apps/mobile/assets/brand/README.md` documents palette, usage, and the generation prompt set.
 

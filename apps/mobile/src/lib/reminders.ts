@@ -263,7 +263,10 @@ async function respond(response: Notifications.NotificationResponse) {
       router.navigate("/");
       return;
     default:
-      router.navigate("/");
+      // Tapping the reminder itself opens a voice check-in about the task.
+      if (!data.share && task)
+        router.navigate({ pathname: "/talk", params: { task: task.id, checkin: data.kind } });
+      else router.navigate("/");
   }
 }
 

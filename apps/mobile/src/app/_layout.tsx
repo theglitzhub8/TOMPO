@@ -70,6 +70,7 @@ export default function Layout() {
               <Stack.Screen name="inbox" />
               <Stack.Screen name="calendar" />
               <Stack.Screen name="next" />
+              <Stack.Screen name="talk" />
               <Stack.Screen
                 name="onboarding"
                 options={{ presentation: "modal", animation: "default" }}

@@ -1,4 +1,4 @@
-import { askClaude } from "./ai.js";
+import { askAi } from "./ai.js";
 
 export function validatePlanningInput(input: unknown): {
   text: string;
@@ -23,12 +23,13 @@ export function validatePlanningInput(input: unknown): {
 }
 export class PlanningLimit {
   private entries = new Map<string, { count: number; until: number }>();
+  constructor(private max = 20) {}
   allow(ip: string, now = Date.now()) {
     for (const [key, entry] of this.entries)
       if (entry.until <= now) this.entries.delete(key);
     const entry = this.entries.get(ip) || { count: 0, until: now + 3600000 };
     if (
-      entry.count >= 20 ||
+      entry.count >= this.max ||
       (!this.entries.has(ip) && this.entries.size >= 10000)
     )
       return false;
@@ -39,5 +40,5 @@ export class PlanningLimit {
 }
 /** Receives only the submitted capture; the HTTP handler verifies the account first. */
 export async function planCapture(input: unknown) {
-  return askClaude("task-extraction", validatePlanningInput(input));
+  return askAi("task-extraction", validatePlanningInput(input));
 }

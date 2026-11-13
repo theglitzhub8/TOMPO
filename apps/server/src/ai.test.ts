@@ -18,7 +18,7 @@ test("valid provider JSON and fenced JSON are both decoded and validated", () =>
   ]) {
     assert.deepEqual(
       decodeAiContent(
-        { stop_reason: "end_turn", content: [{ type: "text", text }] },
+        { choices: [{ finish_reason: "stop", message: { content: text } }] },
         "task-extraction",
       ),
       content,
@@ -29,8 +29,9 @@ test("truncated, malformed, empty and invalid AI plans never reach persistence",
   assert.throws(() =>
     decodeAiContent(
       {
-        stop_reason: "max_tokens",
-        content: [{ type: "text", text: JSON.stringify(content) }],
+        choices: [
+          { finish_reason: "length", message: { content: JSON.stringify(content) } },
+        ],
       },
       "task-extraction",
     ),
@@ -43,12 +44,12 @@ test("truncated, malformed, empty and invalid AI plans never reach persistence",
     JSON.stringify({ tasks: [{ ...content.tasks[0], duration: "90" }] }),
   ])
     assert.throws(() =>
-      decodeAiContent({ content: [{ type: "text", text }] }, "task-extraction"),
+      decodeAiContent({ choices: [{ message: { content: text } }] }, "task-extraction"),
     );
 });
 test("provider deadlines, priorities and named projects survive validation; impossible dates fail",()=>{
   const item={...content.tasks[0],dueDay:"2026-10-24",priority:"high",project:"Launch"};
-  const decoded=decodeAiContent({content:[{type:"text",text:JSON.stringify({tasks:[item]})}]},"task-extraction");
+  const decoded=decodeAiContent({choices:[{message:{content:JSON.stringify({tasks:[item]})}}]},"task-extraction");
   assert.equal(decoded.tasks[0].dueDay,"2026-10-24");assert.equal(decoded.tasks[0].priority,"high");
-  for(const extra of [{dueDay:"2026-02-30"},{priority:"critical"},{project:42}]) assert.throws(()=>decodeAiContent({content:[{type:"text",text:JSON.stringify({tasks:[{...item,...extra}]})}]},"task-extraction"));
+  for(const extra of [{dueDay:"2026-02-30"},{priority:"critical"},{project:42}]) assert.throws(()=>decodeAiContent({choices:[{message:{content:JSON.stringify({tasks:[{...item,...extra}]})}}]},"task-extraction"));
 });

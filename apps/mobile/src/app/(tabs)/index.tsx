@@ -29,6 +29,7 @@ import {
   TeamTasks,
 } from "../../components/today-extras";
 import { ReminderPrompt } from "../../components/reminder-card";
+import { replanFromNow } from "../../lib/replan";
 import { shadow } from "../../design/tokens";
 import { localParts } from "../../../../../packages/core/src/scheduling";
 import { buildDay } from "../../../../../packages/core/src/day-planner";
@@ -296,6 +297,13 @@ export default function Today() {
           </Reveal>
           <Reveal delay={220} style={{ flexDirection: "row", gap: 10, flexWrap: "wrap" }}>
             <Button
+              title="Talk to Tempo"
+              icon="mic"
+              compact
+              style={{ flex: 1, minWidth: 130 }}
+              onPress={() => router.navigate("/talk")}
+            />
+            <Button
               title="Tell Tempo more"
               icon="add"
               variant="secondary"
@@ -304,13 +312,9 @@ export default function Today() {
               onPress={() => router.navigate("/planning")}
             />
             <Action title="Replan from now" icon="sync" variant="secondary" compact style={{ flex: 1, minWidth: 130 }} run={async () => {
-              const current = useTempo.getState();
-              const revised = buildDay([...current.tasks, ...sharedPlanTasks(current.shares.incoming)].sort((a,b) => (a.scheduledAt || "z").localeCompare(b.scheduledAt || "z")), current.routines, day,
-                current.preferences.timezone, new Date(), current.preferences.dayEnd || "21:00", true);
-              const changed = revised.tasks.filter(t => !isSharedId(t.id) && current.tasks.some(old => old.id === t.id && old.scheduledAt !== t.scheduledAt));
-              await current.saveReviewedPlan(changed, current.preferences.dayEnd || "21:00", current.revision);
+              const result = await replanFromNow();
               setNow(new Date());
-              setMessage(`Plan updated. ${revised.overflow.length} tasks waiting for space.${revised.warnings.length ? ` ${revised.warnings.join(" ")}` : ""}`);
+              setMessage(result);
             }} />
             <Button
               title="My day changed"
