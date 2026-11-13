@@ -18,6 +18,8 @@ An account is required before any planner screen can open, including deep links.
 
 Names, email addresses, tasks, projects, routines, and preferences are stored in PostgreSQL under the authenticated user’s ID. Passwords use salted scrypt hashes. Native session tokens use SecureStore; browser tokens are scoped to the tab. Signing out clears the active workspace and draft from app memory and revokes the session when the backend is reachable.
 
+**Login with Hafrik** (iOS and Android) opens Hafrik in a secure browser sheet. Accounts are linked by Hafrik `user_id` (`users.external_id = hafrik:<id>`), never by email: a Hafrik email already used by a Tempo account is not attached, and the existing account is untouched. Because Hafrik's OAuth returns no `state`, the app sends `sha256(verifier)` to `/v1/auth/hafrik/start`; the callback (bound to that start by a short-lived cookie) exchanges Hafrik's `auth_key` server-side and returns only a one-time ticket to `tempo://auth/hafrik`, which the app redeems with its verifier at `/v1/auth/hafrik/session`. Hafrik tokens and the App Secret never reach the app. Set `HAFRIK_APP_ID` and `HAFRIK_APP_SECRET` on the backend to enable it.
+
 The backend is the source of truth. Sign in on another device to restore the workspace, or use Settings → Refresh saved plan. Saves require a connection and succeed only after the backend commits. Failed writes show an error; conflicting device edits return the latest saved version for review. Old anonymous SQLite files are preserved but are not automatically assigned to a new account.
 
 ## Run locally

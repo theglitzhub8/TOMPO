@@ -50,7 +50,7 @@ export class Auth {
   async authenticate(token: string) {
     if (!/^[a-f0-9]{64}$/.test(token)) return null;
     const r = await this.pool.query(
-      "SELECT u.id,u.email,u.display_name AS name FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>now()",
+      "SELECT u.id,COALESCE(u.email,'') AS email,u.display_name AS name FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>now()",
       [digest(token)],
     );
     return r.rows[0] ?? null;

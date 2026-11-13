@@ -6,6 +6,7 @@ import {
 import { Collaboration, TeamError } from "./collaboration.js";
 import { Recovery, type ResetMailer } from "./recovery.js";
 import { Auth } from "./auth.js";
+import { HafrikError, HafrikLogin, type HafrikFetch } from "./hafrik.js";
 import { Store, WorkspaceConflict } from "./store.js";
 import { PlanningLimit, planCapture } from "./planning.js";
 import { ShareError, Shares } from "./shares.js";
@@ -24,7 +25,7 @@ async function body(req: IncomingMessage) {
 }
 export function createTempoServer(
   store: Store,
-  options: { sendPush?: PushSender | null; sendReset?: ResetMailer } = {},
+  options: { sendPush?: PushSender | null; sendReset?: ResetMailer; hafrikFetch?: HafrikFetch } = {},
 ) {
   const auth = new Auth(store.pool);
   const authLimits = new Map<string, { count: number; until: number }>();
@@ -36,6 +37,7 @@ export function createTempoServer(
   const shares = new Shares(store.pool, push);
   const team = new Collaboration(store.pool, push);
   const recovery = new Recovery(store.pool, options.sendReset);
+  const hafrik = new HafrikLogin(store.pool, auth, options.hafrikFetch);
   store.onSharedChange = (changes) => {
     void (async () => {
       const names = await store.pool.query(
@@ -91,6 +93,19 @@ export function createTempoServer(
     });
     res.end(JSON.stringify(data));
   };
+  const redirect = (res: ServerResponse, location: string, cookie?: string) => {
+    res.writeHead(302, {
+      location,
+      "cache-control": "no-store",
+      "referrer-policy": "no-referrer",
+      ...(cookie ? { "set-cookie": cookie } : {}),
+    });
+    res.end();
+  };
+  const hafrikCookie = (value: string, maxAge: number) =>
+    `tempo_hafrik=${value}; Path=/v1/auth/hafrik; Max-Age=${maxAge}; HttpOnly; Secure; SameSite=Lax`;
+  const toApp = (params: Record<string, string>) =>
+    `${hafrik.appRedirect}?${new URLSearchParams(params).toString()}`;
   return createServer(async (req, res) => {
     const url = new URL(
       req.url || "/",
@@ -126,9 +141,27 @@ export function createTempoServer(
           service: "tempo-server",
           accountsRequired: true,
         });
+      if (req.method === "GET" && url.pathname === "/v1/auth/hafrik/start") {
+        try {
+          const { state, location } = hafrik.start(url.searchParams.get("challenge"));
+          return redirect(res, location, hafrikCookie(state, 600));
+        } catch (e) {
+          return redirect(res, toApp({ error: e instanceof HafrikError ? e.message : "Could not start Login with Hafrik." }));
+        }
+      }
+      if (req.method === "GET" && url.pathname === "/v1/auth/hafrik/callback") {
+        const state = /(?:^|;\s*)tempo_hafrik=([a-f0-9]{64})/.exec(req.headers.cookie || "")?.[1] ?? null;
+        const clear = hafrikCookie("", 0);
+        try {
+          const ticket = await hafrik.callback(state, url.searchParams.get("auth_key"));
+          return redirect(res, toApp({ ticket }), clear);
+        } catch (e) {
+          return redirect(res, toApp({ error: e instanceof HafrikError ? e.message : "Could not finish Login with Hafrik." }), clear);
+        }
+      }
       if (
         req.method === "POST" &&
-        ["/v1/auth/register", "/v1/auth/login", "/v1/auth/forgot", "/v1/auth/reset"].includes(url.pathname)
+        ["/v1/auth/register", "/v1/auth/login", "/v1/auth/forgot", "/v1/auth/reset", "/v1/auth/hafrik/session"].includes(url.pathname)
       ) {
         const now = Date.now(),
           ip = req.socket.remoteAddress || "unknown";
@@ -148,6 +181,10 @@ export function createTempoServer(
           input = await body(req);
         } catch {
           return json(res, 400, { error: "Invalid account request." });
+        }
+        if (url.pathname.endsWith("hafrik/session")) {
+          try { return json(res, 200, await hafrik.redeem(input)); }
+          catch(e) { if (e instanceof HafrikError) return json(res, 400, { error: e.message }); throw e; }
         }
         if (url.pathname.endsWith("forgot") || url.pathname.endsWith("reset")) {
           try { return json(res, 200, await (url.pathname.endsWith("forgot") ? recovery.request(input) : recovery.reset(input))); }
@@ -195,7 +232,7 @@ export function createTempoServer(
         if (!name || name.length > 80)
           return json(res, 400, { error: "Use a name of 1–80 characters." });
         const result = await store.pool.query(
-          "UPDATE users SET display_name=$1 WHERE id=$2 RETURNING id,email,display_name AS name",
+          "UPDATE users SET display_name=$1 WHERE id=$2 RETURNING id,COALESCE(email,'') AS email,display_name AS name",
           [name, account.id],
         );
         return json(res, 200, { user: result.rows[0] });

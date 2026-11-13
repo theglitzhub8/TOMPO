@@ -10,6 +10,7 @@ import {
 } from "../../../../packages/core/src/model";
 import * as session from "../lib/session";
 import { ApiError, apiBase, request } from "../lib/api";
+import { hafrikTicket } from "../lib/hafrik";
 import { recurringOccurrences, skipOccurrences } from "../../../../packages/core/src/day-lifecycle";
 import { localParts } from "../../../../packages/core/src/scheduling";
 export type {
@@ -198,6 +199,8 @@ type State = {
     mode: "login" | "register",
     input: { name: string; email: string; password: string },
   ) => Promise<void>;
+  /** Resolves false when the person closes the Hafrik sheet. */
+  signInWithHafrik: () => Promise<boolean>;
   signOut: () => Promise<void>;
   updateName: (name: string) => Promise<void>;
   saveTasks: (tasks: Task[]) => Promise<void>;
@@ -322,6 +325,33 @@ export const useTempo = create<State>((set, get) => {
       /* Sharing is optional; the plan still works. */
     }
   }
+  // Finishes any sign-in once the server has issued a session token.
+  async function open(
+    base: string,
+    result: { user: Account; token: string },
+    ticket: number,
+  ) {
+    const user = account(result.user);
+    if (!/^[a-f0-9]{64}$/.test(result.token))
+      throw new Error("Could not establish a secure session.");
+    const workspace = await request<Workspace>(
+      base,
+      "/v1/workspace",
+      result.token,
+    );
+    if (ticket !== epoch) throw new Error("Account request was superseded.");
+    const data = decodeWorkspace(workspace);
+    await persistToken(result.token, ticket);
+    if (ticket !== epoch) return;
+    connection = {
+      userId: user.id,
+      token: result.token,
+      base,
+      epoch: ticket,
+    };
+    set({ ...data, user, ready: true, booting: false, error: null });
+    void afterSignIn();
+  }
   return {
     ...empty(),
     ready: false,
@@ -386,26 +416,23 @@ export const useTempo = create<State>((set, get) => {
         null,
         input,
       );
-      const user = account(result.user);
-      if (!/^[a-f0-9]{64}$/.test(result.token))
-        throw new Error("Could not establish a secure session.");
-      const workspace = await request<Workspace>(
+      await open(base, result, ticket);
+    },
+    signInWithHafrik: async () => {
+      const base = await apiBase();
+      const grant = await hafrikTicket(base);
+      if (!grant) return false;
+      const ticket = ++epoch;
+      connection = null;
+      set({ ...empty(), user: null, ready: false, error: null });
+      const result = await request<{ user: Account; token: string }>(
         base,
-        "/v1/workspace",
-        result.token,
+        "/v1/auth/hafrik/session",
+        null,
+        grant,
       );
-      if (ticket !== epoch) throw new Error("Account request was superseded.");
-      const data = decodeWorkspace(workspace);
-      await persistToken(result.token, ticket);
-      if (ticket !== epoch) return;
-      connection = {
-        userId: user.id,
-        token: result.token,
-        base,
-        epoch: ticket,
-      };
-      set({ ...data, user, ready: true, booting: false, error: null });
-      void afterSignIn();
+      await open(base, result, ticket);
+      return true;
     },
     signOut: async () => {
       const previous = connection;

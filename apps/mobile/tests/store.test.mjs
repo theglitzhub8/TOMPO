@@ -12,6 +12,7 @@ const session = data(
 const api = data(
   'export class ApiError extends Error {constructor(message,status,data){super(message);this.status=status;this.data=data}} export async function apiBase(){return "http://test"} export async function request(...args){return globalThis.tempoStoreTestRequest(...args)}',
 );
+const hafrik = data("export async function hafrikTicket(){return null}");
 let source = await readFile(
   new URL("../src/data/store.ts", import.meta.url),
   "utf8",
@@ -29,6 +30,7 @@ source = source
   )
   .replace(/from "\.\.\/lib\/session"/g, `from "${session}"`)
   .replace(/from "\.\.\/lib\/api"/g, `from "${api}"`)
+  .replace(/from "\.\.\/lib\/hafrik"/g, `from "${hafrik}"`)
   .replace(
     /from "\.\.\/\.\.\/\.\.\/\.\.\/packages\/core\/src\/([^".]+)"/g,
     (_, name) =>

@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import { useRef, useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { Pressable, Text, TextInput, View, type TextInputInstance } from "react-native";
 import {
   Screen,
   Card,
@@ -162,7 +162,7 @@ function ProjectCard({
   const { save, removeProject } = useTempo();
   const [name, setName] = useState(project.title);
   const [quick, setQuick] = useState("");
-  const quickInput = useRef<TextInput>(null);
+  const quickInput = useRef<TextInputInstance>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [error, setError] = useState("");
   const complete = tasks.filter((t) => t.status === "completed").length;

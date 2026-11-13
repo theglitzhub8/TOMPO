@@ -8,7 +8,8 @@
     "scheme": "tempo",
     "userInterfaceStyle": "light",
     "ios": {
-      "bundleIdentifier": "com.tempo.discipline",
+      "bundleIdentifier": "com.theglitzhub.tempo",
+      "appleTeamId": "PTMQYUSUAT",
       "supportsTablet": true
     },
     "android": {
@@ -18,7 +19,7 @@
         "monochromeImage": "./assets/brand/tempo-mark.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.tempo.discipline"
+      "package": "com.theglitzhub.tempo"
     },
     "web": {
       "output": "static",
@@ -54,6 +55,7 @@
       [
         "expo-widgets",
         {
+          "groupIdentifier": "group.com.theglitzhub.tempo",
           "widgets": [
             {
               "name": "TempoNext",
@@ -76,7 +78,8 @@
         {
           "calendarPermission": "Allow Tempo to show calendar events so you can choose which appointments to add to your plan."
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true

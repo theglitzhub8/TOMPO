@@ -41,6 +41,7 @@ function configure() {
     });
     await Notifications.setNotificationChannelAsync(channelId, {
       name: "Task reminders",
+      // eslint-disable-next-line import/namespace -- exported at runtime; the plugin cannot parse the compiled enum
       importance: Notifications.AndroidImportance.HIGH,
       vibrationPattern: [0, 250, 150, 250],
       lightColor: "#E86A4A",

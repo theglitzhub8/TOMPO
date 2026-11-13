@@ -33,7 +33,8 @@ import { theme, shadow, gradient, gradients } from "../../design/tokens";
 const native = Platform.OS !== "web";
 
 export default function Auth() {
-  const { authenticate, initialize, error: sessionError } = useTempo();
+  const { authenticate, signInWithHafrik, initialize, error: sessionError } =
+    useTempo();
   const insets = useSafeAreaInsets();
   const [mode, setMode] = useState<"login" | "register">("register");
   const [name, setName] = useState(""),
@@ -78,6 +79,24 @@ export default function Auth() {
         e instanceof Error
           ? e.message
           : "Could not open your account. Try again.",
+      );
+    } finally {
+      lock.current = false;
+      setBusy(false);
+    }
+  };
+  const hafrik = async () => {
+    if (lock.current) return;
+    lock.current = true;
+    setBusy(true);
+    setError("");
+    try {
+      await signInWithHafrik();
+    } catch (e) {
+      setError(
+        e instanceof Error
+          ? e.message
+          : "Could not sign in with Hafrik. Try again.",
       );
     } finally {
       lock.current = false;
@@ -227,6 +246,25 @@ export default function Auth() {
                   </>
                 )}
               </Tap>
+              {native && (
+                <>
+                  <View style={s.divider}>
+                    <View style={s.dividerLine} />
+                    <Text style={s.dividerText}>or</Text>
+                    <View style={s.dividerLine} />
+                  </View>
+                  <Tap
+                    accessibilityRole="button"
+                    accessibilityLabel="Continue with Hafrik"
+                    accessibilityState={{ disabled: busy, busy }}
+                    disabled={busy}
+                    onPress={hafrik}
+                    style={s.hafrik}
+                  >
+                    <Text style={s.hafrikText}>Continue with Hafrik</Text>
+                  </Tap>
+                </>
+              )}
               {!!sessionError && (
                 <Pressable
                   accessibilityRole="button"
@@ -665,6 +703,29 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: theme.accent,
+  },
+  divider: { flexDirection: "row", alignItems: "center", gap: 12 },
+  dividerLine: { flex: 1, height: 1, backgroundColor: theme.line },
+  dividerText: {
+    fontFamily: theme.fonts.semibold,
+    fontSize: 13,
+    color: theme.faint,
+  },
+  hafrik: {
+    minHeight: 56,
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: theme.line,
+    backgroundColor: theme.surface,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 20,
+  },
+  hafrikText: {
+    fontFamily: theme.fonts.bold,
+    fontSize: 16,
+    color: theme.ink,
+    letterSpacing: -0.2,
   },
   secondary: {
     minHeight: 44,
