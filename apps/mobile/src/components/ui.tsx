@@ -132,8 +132,8 @@ export const styles = StyleSheet.create({
     flexGrow: 1,
   },
   title: {
-    fontSize: 44,
-    lineHeight: 48,
+    fontSize: 42,
+    lineHeight: 44,
     fontFamily: theme.fonts.display,
     color: theme.ink,
     letterSpacing: -0.6,
@@ -153,8 +153,8 @@ export const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: theme.surface,
-    borderRadius: theme.radius,
-    padding: 22,
+    borderRadius: 24,
+    padding: 20,
     gap: 14,
     borderWidth: 1,
     borderColor: theme.line,
@@ -327,7 +327,7 @@ export function Avatar({
           justifyContent: "center",
           backgroundColor: dark ? theme.accent : theme.ink,
         },
-        gradient(dark ? gradients.coral : gradients.night),
+        gradient(dark ? gradients.accent : gradients.night),
       ]}
     >
       <Text
@@ -362,7 +362,6 @@ export function Screen({
   const name = useTempo((s) => s.user?.name ?? "");
   const cloudError = useTempo((s) => (s.user ? s.error : null));
   const pending = useTempo((s) => s.pending);
-  const lastSavedAt = useTempo(s => s.lastSavedAt);
   const canUndo = useTempo(s => !!s.undoEntry && s.undoEntry.revision === s.revision);
   const detail = ![
     "/",
@@ -372,7 +371,7 @@ export function Screen({
     "/tasks",
   ].includes(pathname);
   // Tab routes (including hidden ones) already get the bar from the tabs layout.
-  const stackRoute = ["/onboarding", "/reports", "/notification-test", "/week", "/team", "/inbox", "/calendar", "/next"].includes(
+  const stackRoute = ["/onboarding", "/reports", "/notification-test", "/week", "/my-week", "/team", "/inbox", "/calendar", "/next"].includes(
     pathname,
   );
   const date = new Intl.DateTimeFormat("en-US", {
@@ -380,7 +379,9 @@ export function Screen({
     weekday: "long",
     month: "short",
     day: "numeric",
-  }).format(new Date());
+  })
+    .format(new Date())
+    .replace(",", " ·");
   return (
     <View style={styles.screen}>
       <SafeAreaView
@@ -417,43 +418,33 @@ export function Screen({
                   <Icon name="back" size={20} />
                 </Tap>
               ) : (
-                <View
-                  accessibilityLabel="Tempo"
-                  style={{ flexDirection: "row", alignItems: "center", gap: 10 }}
+                <Text
+                  style={{
+                    fontFamily: theme.fonts.bold,
+                    fontSize: 12,
+                    letterSpacing: 1.2,
+                    color: theme.muted,
+                  }}
                 >
-                  <BrandMark size={32} />
-                  <Text
-                    style={{
-                      fontFamily: theme.fonts.heavy,
-                      fontSize: 19,
-                      color: theme.ink,
-                      letterSpacing: -0.8,
-                    }}
-                  >
-                    tempo
-                  </Text>
-                </View>
+                  {date.toUpperCase()}
+                </Text>
               )}
               <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-                <View style={datePill}>
-                  <View
-                    style={{
-                      width: 6,
-                      height: 6,
-                      borderRadius: 3,
-                      backgroundColor: pending ? theme.accent : theme.mintDeep,
-                    }}
-                  />
-                  <Text
-                    style={{
-                      fontFamily: theme.fonts.semibold,
-                      fontSize: 12,
-                      color: theme.inkSoft,
-                    }}
-                  >
-                    {date}
-                  </Text>
-                </View>
+                {(pending || !!cloudError) && (
+                  <View style={datePill}>
+                    <View
+                      style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: 3,
+                        backgroundColor: cloudError ? theme.danger : theme.accent,
+                      }}
+                    />
+                    <Text style={{ fontFamily: theme.fonts.semibold, fontSize: 12, color: theme.inkSoft }}>
+                      {cloudError ? "Not saved" : "Saving…"}
+                    </Text>
+                  </View>
+                )}
                 {!!name && pathname !== "/settings" && (
                   <Tap
                     accessibilityRole="button"
@@ -466,7 +457,7 @@ export function Screen({
                 )}
               </View>
             </View>
-            <Reveal style={{ gap: 10, marginTop: 18, marginBottom: 10 }}>
+            <Reveal style={{ gap: 8, marginTop: 8, marginBottom: 6 }}>
               {eyebrow && <Eyebrow>{eyebrow}</Eyebrow>}
               <Text accessibilityRole="header" style={styles.title}>
                 {title}
@@ -489,10 +480,16 @@ export function Screen({
               )}
             </Reveal>
             {!!cloudError && <Notice tone="danger">{cloudError}</Notice>}
-            {!!name && <View style={{ flexDirection: "row", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-              <Body small>{pending ? "Saving online…" : cloudError ? "Changes need attention" : lastSavedAt ? "Saved online" : "Ready"}</Body>
-              {canUndo && !pending && <Action title="Undo last edit" variant="ghost" compact run={() => useTempo.getState().undo()} />}
-            </View>}
+            {canUndo && !pending && (
+              <Action
+                title="Undo last change"
+                icon="redo"
+                variant="ghost"
+                compact
+                style={{ alignSelf: "flex-start" }}
+                run={() => useTempo.getState().undo()}
+              />
+            )}
             {children}
           </ScrollView>
         </KeyboardAvoidingView>
@@ -856,7 +853,7 @@ const variants: Record<
   accent: {
     box: [
       { backgroundColor: theme.accent, ...shadow.glow },
-      gradient(gradients.coral),
+      gradient(gradients.accent),
     ],
     text: theme.surface,
   },
@@ -1137,7 +1134,7 @@ export function Progress({
               }),
               backgroundColor: dark ? theme.mint : theme.accent,
             },
-            gradient(dark ? gradients.mint : gradients.coral),
+            gradient(dark ? gradients.mint : gradients.accent),
           ]}
         />
       </View>

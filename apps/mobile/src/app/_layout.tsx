@@ -8,6 +8,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { useTempo } from "../data/store";
 import { WidgetSync } from "../lib/widgets";
 import { Brand } from "../components/brand";
+import { CelebrationLayer, useCompletionTreats } from "../components/celebration";
 import { theme, fontAssets, gradient, gradients } from "../design/tokens";
 const client = new QueryClient({ defaultOptions: { queries: { retry: 1 } } });
 export default function Layout() {
@@ -17,6 +18,7 @@ export default function Layout() {
     void initialize();
   }, [initialize]);
   const signedIn = !!user && ready;
+  useCompletionTreats();
   return (
     <SafeAreaProvider>
       <WidgetSync />
@@ -71,6 +73,11 @@ export default function Layout() {
               <Stack.Screen name="calendar" />
               <Stack.Screen name="next" />
               <Stack.Screen name="talk" options={{ animation: "slide_from_bottom" }} />
+              <Stack.Screen name="my-week" />
+              <Stack.Screen
+                name="celebrate"
+                options={{ presentation: "fullScreenModal", animation: "fade" }}
+              />
               <Stack.Screen
                 name="onboarding"
                 options={{ presentation: "modal", animation: "default" }}
@@ -83,6 +90,7 @@ export default function Layout() {
             </Stack.Protected>
           </Stack>
         )}
+        {signedIn && <CelebrationLayer />}
       </QueryClientProvider>
     </SafeAreaProvider>
   );

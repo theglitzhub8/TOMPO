@@ -27,12 +27,12 @@ export default function Tasks() {
   const [query, setQuery] = useState("");
   const [showDone, setShowDone] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
-  const { focus } = useLocalSearchParams<{ focus?: string }>();
+  const { focus, edit } = useLocalSearchParams<{ focus?: string; edit?: string }>();
   const [open, setOpen] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
-  const active = open ?? focus;
+  const active = open ?? focus ?? edit;
   const inFilter = tasks.filter(t => (filter === "all" || t.projectId === filter) &&
     `${t.title} ${t.note || ""} ${t.steps?.join(" ") || ""} ${projects.find(p => p.id === t.projectId)?.title || ""} ${t.dueDay || ""}`.toLowerCase().includes(query.trim().toLowerCase()));
   const visible = inFilter
@@ -102,6 +102,11 @@ export default function Tasks() {
             >
               {task.title}
             </Text>
+            {!!task.note && !isDone && (
+              <Text numberOfLines={2} style={{ fontFamily: theme.fonts.regular, fontSize: 13, lineHeight: 18, color: theme.muted }}>
+                {task.note}
+              </Text>
+            )}
             <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
               {project && (
                 <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: color }} />

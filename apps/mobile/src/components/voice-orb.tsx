@@ -93,7 +93,7 @@ export function VoiceOrb({
               opacity: disabled ? 0.45 : 1,
               ...(listening ? shadow.lifted : shadow.glow),
             },
-            gradient(listening ? gradients.night : gradients.coral),
+            gradient(listening ? gradients.night : gradients.accent),
           ]}
         >
           <Icon name={listening ? "stop" : "mic"} size={36} color={theme.surface} />

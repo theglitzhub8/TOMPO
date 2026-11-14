@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Animated, Easing, Platform, ScrollView, Text, View } from "react-native";
 import { router } from "expo-router";
-import { BrandMark, Icon, Tap, theme, type IconName } from "./ui";
+import { Icon, Tap, theme, type IconName } from "./ui";
+import { Orb } from "./orb";
 import { shadow } from "../design/tokens";
 import type { Task } from "../data/store";
 
@@ -19,7 +20,7 @@ export type Suggestion = {
 };
 
 /** Opens the assistant, optionally sending a first message. */
-export const talk = (say?: string, focus?: "project") =>
+export const talk = (say?: string, focus?: "project" | "week") =>
   router.navigate({
     pathname: "/talk",
     params: { ...(say ? { say } : {}), ...(focus ? { focus } : {}) },
@@ -152,57 +153,33 @@ export function TempoSays({
   const [reply, setReply] = useState("");
   const [busy, setBusy] = useState("");
   return (
-    <View
-      style={{
-        gap: 14,
-        padding: 18,
-        borderRadius: theme.heroRadius,
-        backgroundColor: theme.surface,
-        borderWidth: 1,
-        borderColor: theme.line,
-        ...shadow.soft,
-      }}
-    >
-      <View style={{ flexDirection: "row", gap: 12, alignItems: "flex-start" }}>
-        <TempoAvatar size={40} />
-        <View style={{ flex: 1, gap: 4 }}>
-          <Text style={{ fontFamily: theme.fonts.bold, fontSize: 13, color: theme.muted }}>
-            Tempo
-          </Text>
-          <Text
-            style={{
-              fontFamily: theme.fonts.medium,
-              fontSize: 16.5,
-              lineHeight: 24,
-              color: theme.ink,
-            }}
-          >
+    <View style={{ gap: 12 }}>
+      <View style={{ flexDirection: "row", gap: 10, alignItems: "flex-end" }}>
+        <Tap accessibilityRole="button" accessibilityLabel="Talk to Tempo" onPress={() => talk()} scale={0.9}>
+          <Orb size={38} />
+        </Tap>
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: theme.surface,
+            borderRadius: 20,
+            borderBottomLeftRadius: 6,
+            paddingHorizontal: 15,
+            paddingVertical: 12,
+            borderWidth: 1,
+            borderColor: theme.line,
+            ...shadow.soft,
+          }}
+        >
+          <Text style={{ fontFamily: theme.fonts.semibold, fontSize: 15, lineHeight: 22, color: theme.ink }}>
             {reply || text}
           </Text>
         </View>
-        <Tap
-          accessibilityRole="button"
-          accessibilityLabel="Talk to Tempo"
-          onPress={() => talk()}
-          scale={0.9}
-          style={{
-            width: 44,
-            height: 44,
-            borderRadius: 22,
-            alignItems: "center",
-            justifyContent: "center",
-            backgroundColor: theme.accent,
-            ...shadow.glow,
-          }}
-        >
-          <Icon name="mic" size={22} color={theme.surface} />
-        </Tap>
       </View>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ gap: 8, paddingRight: 4 }}
-        style={{ marginHorizontal: -2 }}
+        contentContainerStyle={{ gap: 8, paddingLeft: 48, paddingRight: 4 }}
       >
         {suggestions.map((s) => (
           <SuggestionChip
@@ -252,7 +229,7 @@ export function SuggestionChip({
         paddingHorizontal: 14,
         height: 38,
         borderRadius: 19,
-        backgroundColor: dark ? "rgba(255,255,255,0.08)" : theme.background,
+        backgroundColor: dark ? "rgba(255,255,255,0.08)" : theme.surface,
         borderWidth: 1,
         borderColor: dark ? theme.darkLine : theme.lineStrong,
         opacity: busy ? 0.5 : 1,
@@ -272,26 +249,9 @@ export function SuggestionChip({
   );
 }
 
-/** Tempo's face: the brand mark with a small "here for you" dot. */
+/** Tempo's face. */
 export function TempoAvatar({ size = 32, active = false }: { size?: number; active?: boolean }) {
-  return (
-    <View style={{ width: size, height: size }}>
-      <BrandMark size={size} />
-      <View
-        style={{
-          position: "absolute",
-          right: -2,
-          bottom: -2,
-          width: size * 0.32,
-          height: size * 0.32,
-          borderRadius: size * 0.16,
-          borderWidth: 2,
-          borderColor: theme.surface,
-          backgroundColor: active ? theme.accent : theme.mintDeep,
-        }}
-      />
-    </View>
-  );
+  return <Orb size={size} active={active} />;
 }
 
 /** Three bouncing dots while Tempo is thinking. */

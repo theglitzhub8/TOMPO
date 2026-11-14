@@ -32,6 +32,7 @@ import {
   type Capture,
 } from "../../../../packages/core/src/day-planner";
 import { localParts } from "../../../../packages/core/src/scheduling";
+import { clashText, findClashes } from "../../../../packages/core/src/clashes";
 
 const dayName = (day: string) =>
   new Date(`${day}T12:00:00Z`).toLocaleDateString(undefined, {
@@ -160,6 +161,25 @@ export function DayCapture() {
         .sort()
         .map((on) => ({ on, items: capture.items.filter((item) => item.day === on) }))
     : [];
+  // Timed items that land on the regular week or an appointment.
+  const clashes = useMemo(
+    () =>
+      (capture?.items ?? []).flatMap((item) => {
+        if (!item.clock) return [];
+        try {
+          const found = findClashes(
+            { day: item.day ?? day, clock: item.clock, duration: item.duration },
+            { routines, tasks, timezone: preferences.timezone },
+          );
+          return found.length
+            ? [`“${item.title}” at ${item.clock} clashes with ${found.map((c) => clashText(c, preferences.timezone)).join(" and ")}.`]
+            : [];
+        } catch {
+          return [];
+        }
+      }),
+    [capture, day, routines, tasks, preferences.timezone],
+  );
   const scheduledCount =
     preview?.plan?.blocks.filter((b) => b.kind === "task").length ?? 0;
   return (
@@ -390,6 +410,11 @@ export function DayCapture() {
               ))}
             </Card>
           )}
+          {clashes.map((text, i) => (
+            <Notice key={i} tone="accent" icon="event">
+              {text} Change its time under Adjust tasks & hours, or keep both.
+            </Notice>
+          ))}
           {!!later.length && (
             <Card style={{ padding: 18, gap: 12 }}>
               <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>

@@ -10,7 +10,7 @@ import { HafrikError, HafrikLogin, type HafrikFetch } from "./hafrik.js";
 import { Store, WorkspaceConflict } from "./store.js";
 import { PlanningLimit, planCapture } from "./planning.js";
 import { aiConfigured } from "./ai.js";
-import { askAssistant } from "./assistant.js";
+import { askAssistant, describeTask } from "./assistant.js";
 import { ShareError, Shares } from "./shares.js";
 import { Push, expoSender, type PushSender } from "./push.js";
 
@@ -342,6 +342,17 @@ export function createTempoServer(
           cloudStorage: true,
           account,
         });
+      if (req.method === "POST" && url.pathname === "/v1/describe") {
+        if (!assistantLimit.allow(account.id))
+          return json(res, 429, { error: "Try again a little later." });
+        try {
+          return json(res, 200, await describeTask(await body(req)));
+        } catch (e) {
+          return json(res, e instanceof Error && e.message.startsWith("Check") ? 400 : 502, {
+            error: e instanceof Error && e.message.startsWith("Check") ? e.message : "Tempo couldn’t write a description right now.",
+          });
+        }
+      }
       if (req.method === "POST" && url.pathname === "/v1/assistant") {
         if (!assistantLimit.allow(account.id))
           return json(res, 429, {

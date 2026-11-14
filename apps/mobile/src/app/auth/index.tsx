@@ -240,7 +240,7 @@ export default function Auth() {
                     <Text style={s.primaryText}>
                       {register ? "Create my account" : "Sign in"}
                     </Text>
-                    <View style={[s.primaryArrow, gradient(gradients.coral)]}>
+                    <View style={[s.primaryArrow, gradient(gradients.accent)]}>
                       <Icon name="arrow" size={18} color={theme.surface} />
                     </View>
                   </>

@@ -44,7 +44,7 @@ function configure() {
       // eslint-disable-next-line import/namespace -- exported at runtime; the plugin cannot parse the compiled enum
       importance: Notifications.AndroidImportance.HIGH,
       vibrationPattern: [0, 250, 150, 250],
-      lightColor: "#E86A4A",
+      lightColor: "#2B57FF",
     });
     await Notifications.setNotificationCategoryAsync("tempo-start", [
       { identifier: "start", buttonTitle: "Start" },
@@ -131,7 +131,10 @@ async function schedule(reminder: Reminder, data: ReminderData, identifier = rem
       title: reminder.title,
       body: reminder.body,
       sound: true,
-      categoryIdentifier: reminder.kind === "end" ? "tempo-end" : "tempo-start",
+      categoryIdentifier:
+        reminder.kind === "end" ? "tempo-end" : reminder.kind === "headsup" ? undefined : "tempo-start",
+      // Strict check-ins break through Focus modes.
+      ...(reminder.urgent ? { interruptionLevel: "timeSensitive" as const } : {}),
       data,
     },
     trigger: {
@@ -264,7 +267,8 @@ async function respond(response: Notifications.NotificationResponse) {
       return;
     default:
       // Tapping the reminder itself opens a voice check-in about the task.
-      if (!data.share && task)
+      if (data.kind === "headsup") router.navigate("/");
+      else if (!data.share && task)
         router.navigate({ pathname: "/talk", params: { task: task.id, checkin: data.kind } });
       else router.navigate("/");
   }

@@ -1,33 +1,37 @@
 import { Platform, type ViewStyle } from "react-native";
 
-// Tempo visual system: warm paper, deep night ink, coral energy, mint calm.
+// Tempo "Momentum": cool bright paper, deep night ink, electric blue means
+// do it now, orange means urgent, green means done.
 export const theme = {
-  background: "#F4F2EC",
+  background: "#F2F4FA",
   surface: "#FFFFFF",
-  surfaceMuted: "#EDEAE2",
-  darkSurface: "#0F1A24",
-  night: "#0F1A24",
-  nightRaised: "#1A2833",
-  ink: "#0F1A24",
-  inkSoft: "#38444E",
-  muted: "#77807C",
-  faint: "#A9AEAA",
-  accent: "#E86A4A",
-  accentDeep: "#C9502F",
-  accentSoft: "#FBE6DC",
-  line: "rgba(15,26,36,0.08)",
-  lineStrong: "rgba(15,26,36,0.14)",
-  danger: "#C94A4A",
-  dangerSoft: "#F8E1DF",
-  mint: "#B9E6D3",
-  mintDeep: "#2E8B67",
-  mintSoft: "#E3F4EC",
-  progress: "#B9E6D3",
-  darkTrack: "rgba(255,255,255,0.12)",
-  darkLine: "rgba(255,255,255,0.10)",
-  darkMuted: "#A9B7BA",
-  callAvatar: "#2C3941",
-  callAccept: "#B9E6D3",
+  surfaceMuted: "#E9ECF5",
+  darkSurface: "#0F1120",
+  night: "#0F1120",
+  nightRaised: "#1B1E35",
+  ink: "#11131D",
+  inkSoft: "#343A4F",
+  muted: "#646A80",
+  faint: "#A3A8BA",
+  accent: "#2B57FF",
+  accentDeep: "#1C3FD6",
+  accentSoft: "#E4EAFF",
+  violet: "#7B4DFF",
+  sun: "#FF6B1A",
+  sunSoft: "#FFE9DB",
+  line: "rgba(17,19,29,0.08)",
+  lineStrong: "rgba(17,19,29,0.14)",
+  danger: "#E5484D",
+  dangerSoft: "#FDE4E4",
+  mint: "#7FE0B8",
+  mintDeep: "#0E9F6E",
+  mintSoft: "#DDF6EC",
+  progress: "#13B07B",
+  darkTrack: "rgba(255,255,255,0.14)",
+  darkLine: "rgba(255,255,255,0.12)",
+  darkMuted: "#A9B0CC",
+  callAvatar: "#262A45",
+  callAccept: "#13B07B",
   radius: 22,
   heroRadius: 30,
   space: 16,
@@ -59,14 +63,14 @@ export const fontAssets = {
 export const shadow = {
   soft: {
     boxShadow:
-      "0px 1px 2px rgba(15,26,36,0.04), 0px 8px 24px rgba(15,26,36,0.06)",
+      "0px 1px 2px rgba(17,19,29,0.04), 0px 8px 24px rgba(17,19,29,0.06)",
   } as ViewStyle,
   lifted: {
     boxShadow:
-      "0px 2px 6px rgba(15,26,36,0.06), 0px 18px 40px rgba(15,26,36,0.12)",
+      "0px 2px 6px rgba(17,19,29,0.06), 0px 18px 40px rgba(17,19,29,0.12)",
   } as ViewStyle,
   glow: {
-    boxShadow: "0px 10px 30px rgba(232,106,74,0.35)",
+    boxShadow: "0px 10px 28px rgba(43,87,255,0.32)",
   } as ViewStyle,
 };
 
@@ -82,10 +86,14 @@ export function gradient(css: string): ViewStyle {
 
 export const gradients = {
   night:
-    "linear-gradient(160deg, #1D2E3A 0%, #0F1A24 55%, #0B131B 100%)",
+    "linear-gradient(160deg, #1E2140 0%, #0F1120 60%, #0A0B16 100%)",
   nightGlow:
-    "radial-gradient(circle at 85% 0%, rgba(232,106,74,0.45) 0%, rgba(232,106,74,0) 45%), radial-gradient(circle at 0% 100%, rgba(185,230,211,0.22) 0%, rgba(185,230,211,0) 50%), linear-gradient(165deg, #1D2E3A 0%, #0F1A24 60%, #0B131B 100%)",
-  coral: "linear-gradient(135deg, #F08463 0%, #E86A4A 50%, #D4532F 100%)",
-  mint: "linear-gradient(135deg, #D2F0E2 0%, #B9E6D3 100%)",
-  paper: "linear-gradient(180deg, #F7F5F0 0%, #F4F2EC 100%)",
+    "radial-gradient(circle at 90% 0%, rgba(123,77,255,0.45) 0%, rgba(123,77,255,0) 45%), radial-gradient(circle at 0% 100%, rgba(43,87,255,0.35) 0%, rgba(43,87,255,0) 50%), linear-gradient(165deg, #1E2140 0%, #0F1120 60%, #0A0B16 100%)",
+  accent: "linear-gradient(135deg, #4A72FF 0%, #2B57FF 50%, #5B3DF0 100%)",
+  /** The "do it now" block: bright blue with a soft highlight. */
+  now: "radial-gradient(circle at 90% 0%, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0) 40%), linear-gradient(150deg, #3A63FF 0%, #2B57FF 45%, #5B3DF0 100%)",
+  orb: "radial-gradient(circle at 30% 30%, #A9BEFF 0%, #2B57FF 45%, #7B4DFF 100%)",
+  mint: "linear-gradient(135deg, #DDF6EC 0%, #9BE6C6 100%)",
+  sun: "linear-gradient(135deg, #FF8A3D 0%, #FF6B1A 100%)",
+  paper: "linear-gradient(180deg, #F6F8FD 0%, #F2F4FA 100%)",
 };

@@ -10,11 +10,14 @@
     "ios": {
       "bundleIdentifier": "com.theglitzhub.tempo",
       "appleTeamId": "PTMQYUSUAT",
-      "supportsTablet": true
+      "supportsTablet": true,
+      "entitlements": {
+        "com.apple.developer.usernotifications.time-sensitive": true
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#17202A",
+        "backgroundColor": "#0F1120",
         "foregroundImage": "./assets/brand/tempo-mark.png",
         "monochromeImage": "./assets/brand/tempo-mark.png"
       },
@@ -34,7 +37,7 @@
         {
           "image": "./assets/brand/tempo-mark.png",
           "imageWidth": 160,
-          "backgroundColor": "#0F1A24",
+          "backgroundColor": "#0F1120",
           "resizeMode": "contain"
         }
       ],
@@ -79,7 +82,8 @@
           "calendarPermission": "Allow Tempo to show calendar events so you can choose which appointments to add to your plan."
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-audio"
     ],
     "experiments": {
       "typedRoutes": true

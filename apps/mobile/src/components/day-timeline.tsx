@@ -80,7 +80,7 @@ export function DayTimeline({
                   alignItems: "center",
                   justifyContent: "center",
                   ...(current
-                    ? { boxShadow: "0px 0px 0px 5px rgba(232,106,74,0.18)" }
+                    ? { boxShadow: "0px 0px 0px 5px rgba(43,87,255,0.18)" }
                     : {}),
                 }}
               >

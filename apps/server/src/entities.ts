@@ -44,7 +44,8 @@ export function validateChanges(input: unknown): Change[] {
         !clock(p.quietStart) ||
         !clock(p.quietEnd) ||
         typeof p.onboardingComplete !== "boolean" ||
-        (p.dayEnd !== undefined && !clock(p.dayEnd))
+        (p.dayEnd !== undefined && !clock(p.dayEnd)) ||
+        (p.treat !== undefined && (typeof p.treat !== "string" || p.treat.length > 120))
       )
         throw new Error("Invalid planning preferences.");
       new Intl.DateTimeFormat("en", { timeZone: p.timezone }).format();
@@ -58,6 +59,7 @@ export function validateChanges(input: unknown): Change[] {
           quietEnd: p.quietEnd,
           onboardingComplete: p.onboardingComplete,
           ...(p.dayEnd === undefined ? {} : { dayEnd: p.dayEnd }),
+          ...(p.treat === undefined ? {} : { treat: p.treat }),
         },
       };
     }
@@ -82,7 +84,17 @@ export function validateChanges(input: unknown): Change[] {
         p.days.some(
           (d: unknown) =>
             !Number.isInteger(d) || Number(d) < 0 || Number(d) > 6,
-        )
+        ) ||
+        (p.skippedDays !== undefined &&
+          (!Array.isArray(p.skippedDays) ||
+            p.skippedDays.length > 366 ||
+            p.skippedDays.some(
+              (d: unknown) =>
+                typeof d !== "string" ||
+                !/^\d{4}-\d{2}-\d{2}$/.test(d) ||
+                !Number.isFinite(Date.parse(`${d}T12:00:00Z`)) ||
+                new Date(`${d}T12:00:00Z`).toISOString().slice(0, 10) !== d,
+            )))
       )
         throw new Error("Invalid routine.");
       return {
@@ -94,6 +106,7 @@ export function validateChanges(input: unknown): Change[] {
           start: p.start,
           protected: true,
           days: [...new Set(p.days)],
+          ...(p.skippedDays === undefined ? {} : { skippedDays: [...new Set(p.skippedDays)] }),
         },
       };
     }

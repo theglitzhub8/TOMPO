@@ -1,4 +1,4 @@
-import { validDay, validClock, validate, type Task, type Routine } from "./model.ts";
+import { validDay, validClock, validate, routineOn, type Task, type Routine } from "./model.ts";
 import { localInstant, localParts } from "./scheduling.ts";
 
 export type CaptureItem = {
@@ -265,7 +265,7 @@ export function buildDay(
       [day, weekday],
       [previous, (weekday + 6) % 7],
     ] as const) {
-      if (!r.days.includes(dow)) continue;
+      if (!routineOn(r, date, dow)) continue;
       const at = localInstant(date, r.start, timezone).getTime();
       if (at + r.duration * 60000 > startOfDay)
         blocks.push({

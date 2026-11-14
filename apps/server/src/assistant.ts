@@ -29,6 +29,8 @@ export type AssistantAction =
       project?: string | null;
     }
   | { type: "project"; title: string }
+  | { type: "routine"; title: string; days: number[]; start: string; duration: number }
+  | { type: "skip"; routineId: string; day: string }
   | { type: "complete" | "reopen" | "delete"; id: string }
   | { type: "replan" };
 export type AssistantReply = { reply: string; actions: AssistantAction[]; listen: boolean };
@@ -51,7 +53,8 @@ export type AssistantInput = {
   mode: string;
   tasks: Snapshot[];
   projects: string[];
-  focus: "project" | null;
+  routines: { id: string; title: string; days: number[]; start: string; duration: number }[];
+  focus: "project" | "week" | null;
   checkin: { taskId: string; kind: "start" | "end" | "followup" } | null;
 };
 
@@ -65,6 +68,8 @@ const realDay = (v: unknown): v is string =>
 const text = (v: unknown, max: number) =>
   typeof v === "string" && v.trim().length > 0 && v.length <= max;
 const priorities = ["low", "normal", "high"];
+const validDays = (v: unknown): v is number[] =>
+  Array.isArray(v) && v.length > 0 && v.length <= 7 && v.every((d) => Number.isInteger(d) && d >= 0 && d <= 6);
 
 export function validateAssistantInput(input: any): AssistantInput {
   const fail = () => {
@@ -113,6 +118,19 @@ export function validateAssistantInput(input: any): AssistantInput {
   if (checkin && !snapshot.some((t) => t.id === checkin.taskId)) fail();
   const projects = Array.isArray(input.projects) ? input.projects : [];
   if (projects.length > 200 || projects.some((p: unknown) => !text(p, 200))) fail();
+  const routines = Array.isArray(input.routines) ? input.routines : [];
+  if (routines.length > 100) fail();
+  for (const r of routines)
+    if (
+      !r ||
+      typeof r.id !== "string" ||
+      r.id.length > 200 ||
+      !text(r.title, 200) ||
+      !validDays(r.days) ||
+      !clockPattern.test(r.start) ||
+      !Number.isInteger(r.duration)
+    )
+      fail();
   return {
     messages: messages.map((m: any) => ({ role: m.role, content: m.content.trim() })),
     day: input.day,
@@ -120,13 +138,18 @@ export function validateAssistantInput(input: any): AssistantInput {
     mode: ["Gentle", "Firm", "Strict"].includes(input.mode) ? input.mode : "Gentle",
     tasks: snapshot,
     projects,
-    focus: input.focus === "project" ? "project" : null,
+    routines: routines.map((r: any) => ({ id: r.id, title: r.title, days: r.days, start: r.start, duration: r.duration })),
+    focus: input.focus === "project" || input.focus === "week" ? input.focus : null,
     checkin: checkin as AssistantInput["checkin"],
   };
 }
 
 /** Keeps only well-formed actions that refer to tasks the person actually has. */
-export function validateAssistantReply(content: any, known: Set<string>): AssistantReply {
+export function validateAssistantReply(
+  content: any,
+  known: Set<string>,
+  knownRoutines: Set<string> = new Set(),
+): AssistantReply {
   if (!content || !text(content.reply, 1200)) throw new Error("AI returned no reply");
   const actions: AssistantAction[] = [];
   for (const a of Array.isArray(content.actions) ? content.actions.slice(0, 60) : []) {
@@ -137,6 +160,17 @@ export function validateAssistantReply(content: any, known: Set<string>): Assist
     }
     if (a.type === "project") {
       if (text(a.title, 200)) actions.push({ type: "project", title: a.title.trim() });
+      continue;
+    }
+    if (a.type === "routine") {
+      if (!text(a.title, 200) || !validDays(a.days) || !clockPattern.test(a.start)) continue;
+      if (!Number.isInteger(a.duration) || a.duration < 1 || a.duration > 1440) continue;
+      actions.push({ type: "routine", title: a.title.trim(), days: [...new Set<number>(a.days)].sort(), start: a.start, duration: a.duration });
+      continue;
+    }
+    if (a.type === "skip") {
+      if (typeof a.routineId === "string" && knownRoutines.has(a.routineId) && realDay(a.day))
+        actions.push({ type: "skip", routineId: a.routineId, day: a.day });
       continue;
     }
     if (a.type === "add") {
@@ -223,6 +257,10 @@ function system(input: AssistantInput) {
     input.focus === "project"
       ? `\nThe person opened you from their projects to describe a project. Set it up in the best way: propose {"type":"project"} with a short, clear name (unless it already exists), then break the work into concrete tasks in a sensible order, each with that project name, a realistic duration, a note, and steps for complex work. Spread the tasks over the coming days so no day is overloaded, finishing before any deadline they give (set dueDay on the tasks). If something important is missing, such as the deadline or how much time they have, ask one short question first and propose nothing yet.`
       : "";
+  const week =
+    input.focus === "week"
+      ? `\nThe person opened you to set up their regular week. Ask what repeats every week if they haven't said, then propose routine actions for everything that repeats. Ask about any missing start time or length before proposing.`
+      : "";
   return `You are Tempo, a voice planning assistant inside a day-planner app. Today is ${input.day} (${now}, timezone ${input.timezone}). Be ${tone}.
 The person speaks to you through speech recognition, which can mishear words: infer what they meant from context, and write task titles cleanly (correct spelling and capitalisation, no filler words, keep their language). If they ask you to polish or reword tasks, propose title updates.
 You can only change their plan by proposing actions; the app shows them and nothing changes until the person confirms. Never claim a change is already made: say what you suggest.
@@ -233,12 +271,16 @@ Return JSON only: {"reply":string,"actions":Action[],"listen":boolean}.
   {"type":"add","title":string,"note":string,"duration":minutes,"day":"YYYY-MM-DD"|null,"clock":"HH:mm"|null,"priority":"low"|"normal"|"high","project":string|null,"steps":string[],"dueDay":"YYYY-MM-DD"|null}
   {"type":"update","id":string,"title"?:string,"note"?:string,"duration"?:minutes,"day"?:"YYYY-MM-DD","clock"?:"HH:mm"|null,"priority"?:"low"|"normal"|"high","project"?:string|null}
   {"type":"project","title":string} creates a project; tasks join a project by its name.
+  {"type":"routine","title":string,"days":[0-6 with 0=Sunday],"start":"HH:mm","duration":minutes} creates a weekly task that repeats every week.
+  {"type":"skip","routineId":string,"day":"YYYY-MM-DD"} skips one weekly task on one date only.
   {"type":"complete","id":string} {"type":"reopen","id":string} {"type":"delete","id":string} {"type":"replan"}
 Add one task per activity the person mentions, in order, with exactly the durations they state. Set clock whenever they state or imply a start time: explicit times give that start, and sequences chain ("wake at 12, exercise 30 minutes, then clean 30 minutes" gives exercise 12:00, clean 12:30). null makes the task flexible; never invent a time. Use day for the date it should happen (null means today).
 Week plans: when they talk about other days ("on Monday I have…, Wednesday I need to…"), add those tasks on their dates from the calendar below, never before today; a weekday name means its next date on or after today. Tasks on a day without times stay flexible so that day can be planned later. Remember what they said for each day across the conversation.
-Every added task gets a note: one short, friendly sentence (under 140 characters) on why it matters or how to do it well, specific to the task and not repeating the title. Never a bare restatement. Estimate realistic durations when not given. Use "replan" when they want the rest of today rearranged. Only use ids from the task list. Do not invent commitments. Never delete or move fixed appointments unless explicitly asked. Propose no actions when they only want advice.${checkin}${focus}
+Weekly tasks: things the person does every week at the same time (class every Monday at 8, gym Tuesday and Thursday at 5) are weekly tasks, listed under "Weekly" below. When they describe their regular week, propose routine actions, one per activity with all its days. Never add a task that overlaps a weekly task or a fixed appointment. If they ask for a time that clashes, say so plainly in reply ("Monday 9 is during Class") and propose the best alternative instead: right after it, or skip that weekly task once if they say they won't go.
+Every added task gets a note: one short, friendly sentence (under 140 characters) on why it matters or how to do it well, specific to the task and not repeating the title. Never a bare restatement. Estimate realistic durations when not given. Use "replan" when they want the rest of today rearranged. Only use ids from the task list. Do not invent commitments. Never delete or move fixed appointments unless explicitly asked. Propose no actions when they only want advice.${checkin}${focus}${week}
 Calendar: ${calendar(input.day).join(", ")}
 Projects: ${JSON.stringify(input.projects)}
+Weekly (days 0=Sunday): ${JSON.stringify(input.routines)}
 Tasks (start is local time, null when flexible): ${JSON.stringify(input.tasks)}`;
 }
 
@@ -259,6 +301,23 @@ export async function askAssistant(raw: unknown): Promise<AssistantReply & { sim
   const content = await chatJson(system(input), messages, 8000);
   return {
     simulation: false,
-    ...validateAssistantReply(content, new Set(input.tasks.map((t) => t.id))),
+    ...validateAssistantReply(
+      content,
+      new Set(input.tasks.map((t) => t.id)),
+      new Set(input.routines.map((r) => r.id)),
+    ),
   };
+}
+
+/** One short, friendly line on why a task matters or how to do it well. */
+export async function describeTask(raw: unknown): Promise<{ note: string | null }> {
+  const input = raw as { title?: unknown; duration?: unknown };
+  if (!input || !text(input.title, 200)) throw new Error("Check the task title.");
+  if (!aiConfigured()) return { note: null };
+  const content = await chatJson(
+    'You write the one-line description shown under a task in a planner. Return JSON {"note":string}: one short, friendly sentence under 140 characters on why the task matters or how to do it well. Be specific to the task, never repeat the title, no emoji. Write in the language of the title.',
+    [{ role: "user", content: JSON.stringify({ title: input.title, minutes: Number.isInteger(input.duration) ? input.duration : null }) }],
+    300,
+  );
+  return { note: text(content?.note, 300) ? content.note.trim() : null };
 }

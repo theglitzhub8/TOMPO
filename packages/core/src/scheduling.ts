@@ -1,6 +1,7 @@
 import {
   validClock,
   validTimezone,
+  routineOn,
   type Routine,
   type Task,
   type Preferences,
@@ -83,11 +84,11 @@ export function planDay(
       .toISOString()
       .slice(0, 10);
     // Include the tail of a previous day's overnight routine only if that day is configured.
-    const prior = r.days.includes((weekday + 6) % 7)
+    const prior = routineOn(r, previous, (weekday + 6) % 7)
       ? localInstant(previous, r.start, timezone).getTime()
       : null;
     return [
-      ...(r.days.includes(weekday)
+      ...(routineOn(r, day, weekday)
         ? [{ start: begin, end: begin + r.duration * 60000 }]
         : []),
       ...(prior === null

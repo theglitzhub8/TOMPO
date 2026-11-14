@@ -21,8 +21,9 @@ export function PreferencesForm({
         onChangeText={setTimezone}
       />
       <Body>
-        Accountability: {mode}. Gentle: initial reminder only. Firm: at most one
-        follow-up. Strict: at most two, ten minutes apart.
+        How hard Tempo pushes: {mode}. Gentle: a heads-up and the start.
+        Firm: plus a nudge 5 minutes in. Strict: plus an urgent check-in at 15
+        minutes.
       </Body>
       <ModeOptions value={mode} onChange={setMode} />
       <Field

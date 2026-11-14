@@ -1,6 +1,6 @@
 import { useTempo, id, type Task } from "../data/store";
 import { replanFromNow } from "./replan";
-import type { Project } from "../../../../packages/core/src/model";
+import type { Project, Routine } from "../../../../packages/core/src/model";
 import { validate } from "../../../../packages/core/src/model";
 import { localInstant, localParts } from "../../../../packages/core/src/scheduling";
 
@@ -32,6 +32,8 @@ export type AssistantAction =
       project?: string | null;
     }
   | { type: "project"; title: string }
+  | { type: "routine"; title: string; days: number[]; start: string; duration: number }
+  | { type: "skip"; routineId: string; day: string }
   | { type: "complete" | "reopen" | "delete"; id: string }
   | { type: "replan" };
 export type AssistantReply = {
@@ -47,7 +49,7 @@ const recent = 2 * 86400000;
 export async function askTempo(
   messages: Turn[],
   checkin?: { taskId: string; kind: CheckinKind },
-  focus?: "project",
+  focus?: "project" | "week",
 ) {
   const state = useTempo.getState();
   const zone = state.preferences.timezone;
@@ -81,6 +83,7 @@ export async function askTempo(
     mode: state.preferences.mode,
     tasks,
     projects: state.projects.slice(0, 200).map((p) => p.title),
+    routines: state.routines.slice(0, 100).map(({ id, title, days, start, duration }) => ({ id, title, days, start, duration })),
     focus: focus ?? null,
     checkin: checkin ?? null,
   });
@@ -89,12 +92,26 @@ export async function askTempo(
 const timeText = (day: string | null | undefined, clock: string | null | undefined) =>
   [day, clock].filter(Boolean).join(" at ");
 
+const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+export const dayList = (days: number[]) =>
+  days.length === 7
+    ? "every day"
+    : [1, 2, 3, 4, 5].every((d) => days.includes(d)) && days.length === 5
+      ? "weekdays"
+      : [...days].sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7)).map((d) => weekdays[d]).join(", ");
+
 /** One plain-language line per proposed change, for the confirm card. */
 export function describe(action: AssistantAction, tasks: Task[]) {
   const name = (taskId: string) => tasks.find((t) => t.id === taskId)?.title ?? "a task";
   switch (action.type) {
     case "project":
       return `Create project “${action.title}”`;
+    case "routine":
+      return `Every week: “${action.title}” · ${dayList(action.days)} at ${action.start} · ${action.duration} min`;
+    case "skip": {
+      const routine = useTempo.getState().routines.find((r) => r.id === action.routineId);
+      return `Skip “${routine?.title ?? "weekly task"}” on ${action.day} only`;
+    }
     case "add":
       return `Add “${action.title}” · ${action.duration} min${action.clock || action.day ? ` · ${timeText(action.day, action.clock)}` : ""}${action.project ? ` · ${action.project}` : ""}`;
     case "complete":
@@ -129,6 +146,7 @@ export async function applyActions(actions: AssistantAction[]) {
   const changed = new Map<string, Task>();
   const removed = new Set<string>();
   const projects: Project[] = [];
+  const routines = new Map<string, Routine>();
   const current = (taskId: string) => changed.get(taskId) ?? state.tasks.find((t) => t.id === taskId);
   const project = (title: string | null) => {
     if (!title) return null;
@@ -149,6 +167,17 @@ export async function applyActions(actions: AssistantAction[]) {
     if (action.type === "replan") continue;
     if (action.type === "project") {
       project(action.title);
+      continue;
+    }
+    if (action.type === "routine") {
+      const routine: Routine = { id: id(), title: action.title, days: action.days, start: action.start, duration: action.duration, protected: true };
+      routines.set(routine.id, routine);
+      continue;
+    }
+    if (action.type === "skip") {
+      const routine = routines.get(action.routineId) ?? state.routines.find((r) => r.id === action.routineId);
+      if (routine)
+        routines.set(routine.id, { ...routine, skippedDays: [...new Set([...(routine.skippedDays ?? []), action.day])] });
       continue;
     }
     if (action.type === "add") {
@@ -207,7 +236,8 @@ export async function applyActions(actions: AssistantAction[]) {
   }
   const tasks = [...changed.values()].filter((t) => !removed.has(t.id));
   for (const t of tasks) validate("task", t);
-  await state.applyChanges(tasks, [...removed], projects);
+  for (const r of routines.values()) validate("routine", r);
+  await state.applyChanges(tasks, [...removed], projects, [...routines.values()]);
   if (actions.some((a) => a.type === "replan")) return replanFromNow();
   return "Done. Your plan is updated.";
 }

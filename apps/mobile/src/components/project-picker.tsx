@@ -10,7 +10,7 @@ import {
 import { Icon, Tap, fieldLabel, inputText, theme } from "./ui";
 import { useTempo, id, type Project } from "../data/store";
 
-const palette = ["#E86A4A", "#2E8B67", "#5B7FD6", "#D9962B", "#8A6FD1", "#2A9D8F"];
+const palette = ["#2B57FF", "#13B07B", "#FF6B1A", "#7B4DFF", "#E5484D", "#0EA5B7"];
 
 /** Stable color per project, derived from its id so no schema change is needed. */
 export function projectColor(id: string | null | undefined) {

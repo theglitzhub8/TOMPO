@@ -28,7 +28,13 @@ export type Routine = {
   duration: number;
   days: number[];
   protected: true;
+  /** Dates (YYYY-MM-DD) this weekly task is skipped, just that once. */
+  skippedDays?: string[];
 };
+
+/** Whether a weekly routine happens on a date (dow: 0 = Sunday). */
+export const routineOn = (r: Routine, date: string, dow: number) =>
+  r.days.includes(dow) && !r.skippedDays?.includes(date);
 export type Preferences = {
   timezone: string;
   mode: Mode;
@@ -36,6 +42,8 @@ export type Preferences = {
   quietEnd: string;
   onboardingComplete: boolean;
   dayEnd?: string;
+  /** What the person gives themself for finishing the day. */
+  treat?: string;
 };
 export type EntityMap = {
   task: Task;
@@ -53,7 +61,7 @@ const deviceZone = (() => {
 })();
 export const defaults: Preferences = {
   timezone: deviceZone,
-  mode: "Gentle",
+  mode: "Firm",
   quietStart: "22:00",
   quietEnd: "07:00",
   onboardingComplete: false,
@@ -80,6 +88,7 @@ export function validate(
       !validTimezone(p.timezone) ||
       !["Gentle", "Firm", "Strict"].includes(p.mode) ||
       (p.dayEnd !== undefined && !validClock(p.dayEnd)) ||
+      (p.treat !== undefined && (typeof p.treat !== "string" || p.treat.length > 120)) ||
       !validClock(p.quietStart) ||
       !validClock(p.quietEnd) ||
       typeof p.onboardingComplete !== "boolean"
@@ -131,7 +140,9 @@ export function validate(
       !validClock(r.start) ||
       r.protected !== true ||
       !r.days.length ||
-      r.days.some((d) => !Number.isInteger(d) || d < 0 || d > 6)
+      r.days.some((d) => !Number.isInteger(d) || d < 0 || d > 6) ||
+      (r.skippedDays !== undefined &&
+        (!Array.isArray(r.skippedDays) || r.skippedDays.length > 366 || r.skippedDays.some((d) => !validDay(d))))
     )
       throw new Error("Invalid recurring routine");
   }

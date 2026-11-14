@@ -15,7 +15,8 @@ import { Icon, Reveal, Tap, theme, type IconName } from "../components/ui";
 import { SuggestionChip, TempoAvatar, TypingDots } from "../components/helper";
 import { useVoice } from "../components/voice-input";
 import { shadow, gradient, gradients } from "../design/tokens";
-import { useTempo, type Task } from "../data/store";
+import { useTempo, type Routine, type Task } from "../data/store";
+import { clashOptions, clashText } from "../../../../packages/core/src/clashes";
 import * as session from "../lib/session";
 import {
   askTempo,
@@ -36,6 +37,11 @@ const starters: { label: string; icon: IconName; say: string }[] = [
   { label: "I'm running late", icon: "clock", say: "I'm running late. Adjust the rest of my day." },
   { label: "Clean up my task names", icon: "edit", say: "Polish the wording of my tasks." },
 ];
+const weekStarters: typeof starters = [
+  { label: "Class or school", icon: "list", say: "I have class every week. Let me tell you the days and times." },
+  { label: "Work hours", icon: "clock", say: "Set up my regular work hours." },
+  { label: "Gym or sport", icon: "bolt", say: "I train every week. Let me tell you when." },
+];
 const projectStarters: typeof starters = [
   { label: "Launch something", icon: "bolt", say: "I want to launch something. Help me set it up as a project." },
   { label: "Study for an exam", icon: "list", say: "I have an exam coming up. Help me set up a study project." },
@@ -50,7 +56,7 @@ export default function Talk() {
     say?: string;
   }>();
   // Opened from Projects: Tempo sets up a project from what the person describes.
-  const focus = params.focus === "project" ? "project" : undefined;
+  const focus = params.focus === "project" || params.focus === "week" ? params.focus : undefined;
   const tasks = useTempo((s) => s.tasks);
   const timezone = useTempo((s) => s.preferences.timezone);
   const firstName = useTempo((s) => s.user?.name.trim().split(/\s+/)[0] ?? "");
@@ -192,7 +198,7 @@ export default function Talk() {
             <TempoAvatar size={38} active={listening || busy} />
             <View style={{ flex: 1 }}>
               <Text style={{ fontFamily: theme.fonts.heavy, fontSize: 17, color: theme.ink, letterSpacing: -0.4 }}>
-                {focus ? "Project setup" : "Tempo"}
+                {focus === "project" ? "Project setup" : focus === "week" ? "Your regular week" : "Tempo"}
               </Text>
               <Text style={{ fontFamily: theme.fonts.medium, fontSize: 12.5, color: listening ? theme.accent : theme.muted }}>
                 {listening ? "Listening…" : busy ? "Thinking…" : applying ? "Updating your plan…" : "Your planning helper"}
@@ -239,9 +245,11 @@ export default function Talk() {
                     textAlign: "center",
                   }}
                 >
-                  {focus
+                  {focus === "project"
                     ? "Tell me about your project."
-                    : `Hi${firstName ? ` ${firstName}` : ""}. How can I help?`}
+                    : focus === "week"
+                      ? "What happens every week?"
+                      : `Hi${firstName ? ` ${firstName}` : ""}. How can I help?`}
                 </Text>
                 <Text
                   style={{
@@ -253,12 +261,14 @@ export default function Talk() {
                     maxWidth: 320,
                   }}
                 >
-                  {focus
+                  {focus === "project"
                     ? "What it is, what needs doing and when it’s due. I’ll create it and spread the work over the coming days."
-                    : "Talk like you would to a friend: your day, your week, what changed. I suggest the changes, you approve them."}
+                    : focus === "week"
+                      ? "Say it naturally: “Monday, Wednesday and Friday I have class from 8 to 11, and gym on Tuesday and Thursday at 5.” I’ll plan everything else around it."
+                      : "Talk like you would to a friend: your day, your week, what changed. I suggest the changes, you approve them."}
                 </Text>
                 <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, justifyContent: "center", marginTop: 6 }}>
-                  {(focus ? projectStarters : starters).map((s) => (
+                  {(focus === "project" ? projectStarters : focus === "week" ? weekStarters : starters).map((s) => (
                     <SuggestionChip key={s.label} suggestion={s} onPress={() => send(s.say)} />
                   ))}
                 </View>
@@ -305,6 +315,14 @@ export default function Talk() {
                     action={action}
                     tasks={tasks}
                     today={today}
+                    clash={!skipped.has(i) ? clashFor(action, proposal, today) : null}
+                    fix={(change) =>
+                      setProposal((list) =>
+                        change.type === "skip"
+                          ? [...list, change]
+                          : list.map((a, n) => (n === i ? change : a)),
+                      )
+                    }
                     on={!skipped.has(i)}
                     first={i === 0}
                     toggle={() =>
@@ -347,7 +365,7 @@ export default function Talk() {
                     style={[
                       pill,
                       { flex: 2, backgroundColor: theme.accent, opacity: applying || !chosen.length ? 0.5 : 1 },
-                      gradient(gradients.coral),
+                      gradient(gradients.accent),
                     ]}
                   >
                     <Icon name="check" size={18} color={theme.surface} />
@@ -444,7 +462,7 @@ export default function Talk() {
                     opacity: busy || applying ? 0.4 : 1,
                     ...(listening ? shadow.lifted : shadow.glow),
                   },
-                  gradient(listening ? gradients.night : gradients.coral),
+                  gradient(listening ? gradients.night : gradients.accent),
                 ]}
               >
                 <Icon name={listening ? "stop" : "mic"} size={24} color={theme.surface} />
@@ -477,12 +495,53 @@ const icons: Record<AssistantAction["type"], IconName> = {
   delete: "delete",
   replan: "sync",
   project: "newFolder",
+  routine: "routine",
+  skip: "close",
 };
+
+/** Whether a proposed timed task lands on a weekly task or appointment, and the ways out. */
+function clashFor(action: AssistantAction, all: AssistantAction[], today: string) {
+  if (action.type !== "add" && action.type !== "update") return null;
+  const state = useTempo.getState();
+  const zone = state.preferences.timezone;
+  let slot: { day: string; clock: string; duration: number } | null = null;
+  if (action.type === "add" && action.clock) slot = { day: action.day ?? today, clock: action.clock, duration: action.duration };
+  if (action.type === "update" && action.clock) {
+    const task = state.tasks.find((t) => t.id === action.id);
+    const at = task?.scheduledAt ? localParts(new Date(task.scheduledAt), zone) : null;
+    slot = { day: action.day ?? at?.date ?? today, clock: action.clock, duration: action.duration ?? task?.duration ?? 30 };
+  }
+  if (!slot) return null;
+  // Weekly tasks proposed or skipped in this same reply count too.
+  const proposed: Routine[] = all.flatMap((a) =>
+    a.type === "routine" ? [{ id: `new-${a.title}`, title: a.title, days: a.days, start: a.start, duration: a.duration, protected: true as const }] : [],
+  );
+  const routines = [...state.routines, ...proposed].map((r) => ({
+    ...r,
+    skippedDays: [...(r.skippedDays ?? []), ...all.flatMap((a) => (a.type === "skip" && a.routineId === r.id ? [a.day] : []))],
+  }));
+  const options = clashOptions(slot, {
+    routines,
+    tasks: state.tasks,
+    timezone: zone,
+    ignoreId: action.type === "update" ? action.id : undefined,
+  });
+  if (!options.clashes.length) return null;
+  const clash = options.clashes[0];
+  return {
+    text: `Clashes with ${clashText(clash, zone)}`,
+    after: options.after,
+    nextDay: options.nextDay,
+    skip: clash.kind === "routine" && !clash.id.startsWith("new-") ? { routineId: clash.id, day: clash.date, title: clash.title } : null,
+  };
+}
 
 function ChangeRow({
   action,
   tasks,
   today,
+  clash,
+  fix,
   on,
   first,
   toggle,
@@ -490,10 +549,15 @@ function ChangeRow({
   action: AssistantAction;
   tasks: Task[];
   today: string;
+  clash: ReturnType<typeof clashFor>;
+  fix: (change: AssistantAction) => void;
   on: boolean;
   first: boolean;
   toggle: () => void;
 }) {
+  const move = (day: string, clock: string) => {
+    if (action.type === "add" || action.type === "update") fix({ ...action, day, clock });
+  };
   const add = action.type === "add" ? action : null;
   const tone = action.type === "delete" ? theme.danger : action.type === "complete" ? theme.mintDeep : theme.accentDeep;
   return (
@@ -549,8 +613,39 @@ function ChangeRow({
             {add.note}
           </Text>
         )}
+        {!!clash && (
+          <View style={{ gap: 8, marginTop: 4, padding: 10, borderRadius: 14, backgroundColor: theme.sunSoft }}>
+            <Text style={{ fontFamily: theme.fonts.semibold, fontSize: 13, lineHeight: 18, color: theme.ink }}>
+              {clash.text}
+            </Text>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+              {clash.after && (
+                <FixChip label={`Right after · ${clash.after.clock}`} onPress={() => move(clash.after!.day, clash.after!.clock)} />
+              )}
+              {clash.skip && (
+                <FixChip label={`Skip ${clash.skip.title} once`} onPress={() => fix({ type: "skip", routineId: clash.skip!.routineId, day: clash.skip!.day })} />
+              )}
+              {clash.nextDay && (
+                <FixChip label={`${dayLabel(clash.nextDay.day, today)} · ${clash.nextDay.clock}`} onPress={() => move(clash.nextDay!.day, clash.nextDay!.clock)} />
+              )}
+            </View>
+          </View>
+        )}
       </View>
       <Icon name={on ? "checkCircle" : "circle"} size={22} color={on ? theme.accent : theme.faint} />
+    </Tap>
+  );
+}
+
+function FixChip({ label, onPress }: { label: string; onPress: () => void }) {
+  return (
+    <Tap
+      accessibilityRole="button"
+      onPress={onPress}
+      scale={0.95}
+      style={{ paddingHorizontal: 11, height: 32, justifyContent: "center", borderRadius: 16, backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.lineStrong }}
+    >
+      <Text style={{ fontFamily: theme.fonts.semibold, fontSize: 12.5, color: theme.ink }}>{label}</Text>
     </Tap>
   );
 }

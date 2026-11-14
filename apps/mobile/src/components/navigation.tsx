@@ -1,126 +1,84 @@
 import { router, usePathname, type Href } from "expo-router";
 import { Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { theme, shadow, gradient, gradients } from "../design/tokens";
+import { theme, shadow } from "../design/tokens";
 import { Icon, Tap, type IconName } from "./ui";
-const destinations: {
-  path: Href;
-  title: string;
-  icon: IconName;
-  primary?: boolean;
-}[] = [
-  { path: "/", title: "Today", icon: "home" },
-  { path: "/projects", title: "Projects", icon: "folder" },
-  // The helper sits in the middle: one tap to talk to Tempo.
-  { path: "/talk", title: "Talk to Tempo", icon: "mic", primary: true },
-  { path: "/tasks", title: "Tasks", icon: "list" },
-  { path: "/settings", title: "Settings", icon: "tune" },
+import { Orb } from "./orb";
+
+const destinations: { path: Href; title: string; icon: IconName; match: string[] }[] = [
+  { path: "/", title: "Today", icon: "home", match: ["/", "/planning"] },
+  { path: "/week", title: "Week", icon: "calendar", match: ["/week", "/my-week", "/calendar"] },
+  { path: "/projects", title: "Goals", icon: "folder", match: ["/projects", "/team"] },
+  { path: "/settings", title: "Me", icon: "person", match: ["/settings", "/tasks", "/reports", "/inbox"] },
 ];
+
 export function BottomBar() {
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
+  const item = (d: (typeof destinations)[number]) => {
+    const selected = d.match.includes(pathname);
+    return (
+      <Tap
+        key={d.title}
+        accessibilityRole="tab"
+        accessibilityState={{ selected }}
+        accessibilityLabel={d.title}
+        onPress={() => router.navigate(d.path)}
+        style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 3, height: 56 }}
+      >
+        <Icon name={d.icon} size={22} color={selected ? theme.accent : theme.faint} />
+        <Text
+          numberOfLines={1}
+          style={{
+            fontSize: 10.5,
+            color: selected ? theme.accent : theme.muted,
+            fontFamily: selected ? theme.fonts.bold : theme.fonts.semibold,
+          }}
+        >
+          {d.title}
+        </Text>
+      </Tap>
+    );
+  };
   return (
     <View
       style={{
         backgroundColor: theme.background,
-        paddingBottom: Math.max(insets.bottom, 12),
-        paddingTop: 8,
-        paddingHorizontal: 20,
+        paddingBottom: Math.max(insets.bottom, 10),
+        paddingTop: 6,
+        paddingHorizontal: 16,
         alignItems: "center",
       }}
     >
       <View
-        style={[
-          {
-            flexDirection: "row",
-            alignItems: "center",
-            width: "100%",
-            maxWidth: 440,
-            height: 68,
-            paddingHorizontal: 6,
-            borderRadius: 34,
-            backgroundColor: theme.night,
-            ...shadow.lifted,
-          },
-          gradient(gradients.night),
-        ]}
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          width: "100%",
+          maxWidth: 460,
+          height: 64,
+          paddingHorizontal: 6,
+          borderRadius: 32,
+          backgroundColor: theme.surface,
+          borderWidth: 1,
+          borderColor: theme.line,
+          ...shadow.lifted,
+        }}
       >
-        {destinations.map((item) => {
-          const selected = pathname === item.path;
-          if (item.primary)
-            return (
-              <View key={item.title} style={{ flex: 1, alignItems: "center" }}>
-                <Tap
-                  accessibilityRole="tab"
-                  accessibilityState={{ selected }}
-                  accessibilityLabel={item.title}
-                  onPress={() => router.navigate(item.path)}
-                  scale={0.92}
-                  style={[
-                    {
-                      width: 54,
-                      height: 54,
-                      borderRadius: 27,
-                      alignItems: "center",
-                      justifyContent: "center",
-                      backgroundColor: theme.accent,
-                      borderWidth: 3,
-                      borderColor: selected
-                        ? "rgba(255,255,255,0.85)"
-                        : "rgba(255,255,255,0.08)",
-                      ...shadow.glow,
-                    },
-                    gradient(gradients.coral),
-                  ]}
-                >
-                  <Icon name={item.icon} size={24} color={theme.surface} />
-                </Tap>
-              </View>
-            );
-          return (
-            <Tap
-              key={item.title}
-              accessibilityRole="tab"
-              accessibilityState={{ selected }}
-              accessibilityLabel={item.title}
-              onPress={() => router.navigate(item.path)}
-              style={{ flex: 1, alignItems: "center" }}
-            >
-              <View
-                style={{
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 3,
-                  height: 52,
-                  minWidth: 56,
-                  paddingHorizontal: 6,
-                  borderRadius: 18,
-                  backgroundColor: selected
-                    ? "rgba(255,255,255,0.10)"
-                    : "transparent",
-                }}
-              >
-                <Icon
-                  name={item.icon}
-                  size={21}
-                  color={selected ? theme.surface : theme.darkMuted}
-                />
-                <Text
-                  numberOfLines={1}
-                  style={{
-                    fontSize: 10.5,
-                    color: selected ? theme.surface : theme.darkMuted,
-                    fontFamily: selected
-                      ? theme.fonts.bold
-                      : theme.fonts.medium,
-                  }}
-                >
-                  {item.title}
-                </Text>
-              </View>
-            </Tap>
-          );
-        })}
+        {destinations.slice(0, 2).map(item)}
+        {/* Tempo, the helper, sits in the middle: one tap to talk. */}
+        <View style={{ flex: 1, alignItems: "center" }}>
+          <Tap
+            accessibilityRole="button"
+            accessibilityLabel="Talk to Tempo"
+            onPress={() => router.navigate("/talk")}
+            scale={0.9}
+            style={{ marginTop: -26 }}
+          >
+            <Orb size={58} />
+          </Tap>
+        </View>
+        {destinations.slice(2).map(item)}
       </View>
     </View>
   );

@@ -11,6 +11,7 @@ import {
   theme,
 } from "../../components/ui";
 import { ReminderSettings } from "../../components/reminder-card";
+import { DriveSettings } from "../../components/drive-settings";
 import { AccountActions, BackendConnection } from "../../components/backend-connection";
 import { useTempo } from "../../data/store";
 export default function Settings() {
@@ -27,16 +28,19 @@ export default function Settings() {
   }, [cloudRequest]);
   return (
     <Screen
-      eyebrow="MAKE IT YOURS"
-      title="Around"
-      titleAccent="your life."
-      subtitle="A little setup, when you need it."
+      eyebrow="ME"
+      title="Make it"
+      titleAccent="yours."
     >
       <BackendConnection />
+      <Group title="HOW HARD TEMPO PUSHES">
+        <DriveSettings />
+      </Group>
       <Group title="REMINDERS">
         <ReminderSettings />
       </Group>
       <Group title="TOOLS">
+        <ListRow icon="doneAll" title="Progress" detail="Your completion, streaks and reports." onPress={()=>router.navigate("/reports")} />
         <ListRow icon="calendar" title="Weekly planning" detail="Fit your workload across seven realistic days." onPress={()=>router.navigate("/week")} />
         <ListRow icon="person" title="Shared projects" detail="Members, assignments, comments, and team busy times." onPress={()=>router.navigate("/team")} />
         <ListRow icon="inbox" title="Activity inbox" detail="Shared updates and approaching deadlines." onPress={()=>router.navigate("/inbox")} />
@@ -70,9 +74,9 @@ export default function Settings() {
         />
         <ListRow
           icon="routine"
-          title="Things that already have a time"
-          detail="Add regular meals, school runs, or other routines. Tempo plans around them."
-          onPress={() => router.navigate("/health")}
+          title="My week"
+          detail="Class, work, gym: whatever repeats every week. Tempo plans around it."
+          onPress={() => router.navigate("/my-week")}
         />
         <ListRow
           icon="folder"

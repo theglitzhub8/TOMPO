@@ -70,7 +70,7 @@ export function ReminderPrompt({ upcoming }: { upcoming: number }) {
                 justifyContent: "center",
                 backgroundColor: theme.accent,
               },
-              gradient(gradients.coral),
+              gradient(gradients.accent),
             ]}
           >
             <Icon name="bellRing" size={22} color={theme.surface} />

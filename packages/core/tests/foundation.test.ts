@@ -5,7 +5,8 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Repository, type Database } from "../src/repository.ts";
-import { defaults, type Task, type Routine } from "../src/model.ts";
+import { defaults as base, type Task, type Routine } from "../src/model.ts";
+const defaults = base;
 import {
   localInstant,
   localParts,
@@ -191,6 +192,7 @@ test("previous-day overnight routine is protected even when today is not enabled
   assert.equal(result.scheduled[0].scheduledAt, "2026-10-12T02:00:00.000Z");
 });
 test("reminder IDs are deterministic with bounded followups and quiet hour filtering", () => {
+  const defaults = { ...base, mode: "Gentle" as const };
   const t = task("t", { scheduledAt: "2026-10-12T01:00:00Z" });
   const now = new Date("2026-10-12T00:00:00Z");
   const gentle = reminderPlan(t, defaults, now);

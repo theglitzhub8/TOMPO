@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   askAssistant,
+  describeTask,
   validateAssistantInput,
   validateAssistantReply,
 } from "./assistant.ts";
@@ -98,6 +99,8 @@ test("projects, notes and week days come through; bad ones are dropped", () => {
     { type: "update", id: "t1", project: "Website launch", note: "Warm up first." },
   ]);
   assert.equal(validateAssistantInput({ ...base, projects: ["Home"], focus: "project" }).focus, "project");
+  assert.equal(validateAssistantInput({ ...base, focus: "week" }).focus, "week");
+  assert.throws(() => validateAssistantInput({ ...base, routines: [{ id: "r", title: "Class", days: [9], start: "08:00", duration: 60 }] }));
   assert.throws(() => validateAssistantInput({ ...base, projects: [42] }));
 });
 
@@ -153,4 +156,40 @@ test("without a Moonshot key the assistant says so and proposes nothing", async 
   const answer = await askAssistant(base);
   assert.equal(answer.simulation, true);
   assert.deepEqual(answer.actions, []);
+});
+
+test("weekly tasks can be created and skipped once, only for the person's own routines", () => {
+  const reply = validateAssistantReply(
+    {
+      reply: "I set your class for Mondays and Wednesdays and skipped gym this Monday.",
+      actions: [
+        { type: "routine", title: "Class", days: [3, 1, 1], start: "08:00", duration: 120 },
+        { type: "routine", title: "Bad", days: [], start: "08:00", duration: 60 },
+        { type: "routine", title: "Bad", days: [1], start: "8am", duration: 60 },
+        { type: "skip", routineId: "gym", day: "2026-11-16" },
+        { type: "skip", routineId: "someone-else", day: "2026-11-16" },
+        { type: "skip", routineId: "gym", day: "2026-11-31" },
+      ],
+    },
+    new Set(),
+    new Set(["gym"]),
+  );
+  assert.deepEqual(reply.actions, [
+    { type: "routine", title: "Class", days: [1, 3], start: "08:00", duration: 120 },
+    { type: "skip", routineId: "gym", day: "2026-11-16" },
+  ]);
+});
+
+test("task descriptions come from Moonshot and are checked", async (t) => {
+  const saved = { ...process.env };
+  process.env.MOONSHOT_API_KEY = "test-key";
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = (async () =>
+    Response.json({ choices: [{ finish_reason: "stop", message: { content: '{"note":"Clear one room at a time so it feels lighter."}' } }] })) as typeof fetch;
+  t.after(() => {
+    globalThis.fetch = realFetch;
+    process.env = saved;
+  });
+  assert.deepEqual(await describeTask({ title: "Clean the house", duration: 30 }), { note: "Clear one room at a time so it feels lighter." });
+  await assert.rejects(describeTask({ title: "" }));
 });

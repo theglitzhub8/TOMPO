@@ -8,20 +8,15 @@ import {
   Body,
   Button,
   Action,
-  Chip,
-  Eyebrow,
   Icon,
   Notice,
-  Progress,
   Reveal,
   Tap,
   theme,
   type IconName,
 } from "../../components/ui";
 import { DailyWrapUp, DayAdjustment } from "../../components/day-adjustments";
-import { NextStepActions } from "../../components/next-step";
 import { DayCapture } from "../../components/day-capture";
-import { DayTimeline } from "../../components/day-timeline";
 import { useTempo, isSharedId, sharedPlanTasks } from "../../data/store";
 import {
   DoneToday,
@@ -30,14 +25,16 @@ import {
   TeamTasks,
 } from "../../components/today-extras";
 import { ReminderPrompt } from "../../components/reminder-card";
-import { TempoSays, helperMessage } from "../../components/helper";
+import { TempoSays, helperMessage, talk } from "../../components/helper";
+import { NowCard } from "../../components/now-card";
+import { DayList } from "../../components/day-list";
+import { progress } from "../../../../../packages/core/src/progress";
 import { replanFromNow } from "../../lib/replan";
-import { shadow } from "../../design/tokens";
 import { localParts } from "../../../../../packages/core/src/scheduling";
 import { buildDay } from "../../../../../packages/core/src/day-planner";
 
 export default function Today() {
-  const { tasks, routines, preferences, save, saveTasks, shares } = useTempo();
+  const { tasks, routines, preferences, save, saveTasks, shares, projects } = useTempo();
   const firstName = useTempo((s) => s.user?.name.trim().split(/\s+/)[0] ?? "");
   const [now, setNow] = useState(new Date());
   const [message, setMessage] = useState("");
@@ -148,16 +145,24 @@ export default function Today() {
       return result;
     },
   });
+  const stats = progress(tasks, todayDate, preferences.timezone);
+  const projectTitle = (id?: string | null) => projects.find((p) => p.id === id)?.title;
   return (
     <Screen
-      eyebrow={day === todayDate ? "ONE DAY AT A TIME" : `YOUR PLAN · ${day}`}
       title={
         day === todayDate
           ? `${greeting}${firstName ? "," : "."}`
-          : "A little head start."
+          : "A head start."
       }
       titleAccent={day === todayDate && firstName ? `${firstName}.` : undefined}
     >
+      <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
+        <StatusPill icon="bolt" tint={stats.streak ? theme.sun : theme.faint} label={`${stats.streak}-day streak`} />
+        {stats.today.planned > 0 && (
+          <StatusPill icon="doneAll" tint={theme.progress} label={`${stats.today.score}% done today`} />
+        )}
+        <StatusPill icon="sparkle" tint={theme.violet} label={`${stats.points.toLocaleString()} pts`} />
+      </View>
       {day !== todayDate && (
         <Button
           title="Back to today"
@@ -174,16 +179,24 @@ export default function Today() {
         </Notice>
       ))}
       {!!recurrenceError && <Notice tone="danger">{recurrenceError}</Notice>}
-      <Reveal delay={40}>
+      <Invitations />
+      {next && (
+        <Reveal delay={40}>
+          <NowCard key={next.id} task={next} project={projectTitle(next.projectId)} />
+        </Reveal>
+      )}
+      {hasDay && !next && allDone && (
+        <Reveal delay={40}>
+          <Card style={{ alignItems: "center", gap: 8, paddingVertical: 26, backgroundColor: theme.mintSoft, borderColor: "transparent" }}>
+            <Icon name="doneAll" size={30} color={theme.mintDeep} />
+            <Text style={{ fontFamily: theme.fonts.display, fontSize: 32, color: theme.ink }}>All done for today.</Text>
+            <Button title="See your day" icon="sparkle" compact variant="secondary" onPress={() => router.navigate("/celebrate")} />
+          </Card>
+        </Reveal>
+      )}
+      <Reveal delay={80}>
         <TempoSays text={helper.text} suggestions={helper.suggestions} />
       </Reveal>
-      <Reveal delay={90} style={{ flexDirection: "row", gap: 10 }}>
-        <Shortcut icon="calendar" label="Week" onPress={() => router.navigate("/week")} />
-        <Shortcut icon="event" label="Calendar" onPress={() => router.navigate("/calendar")} />
-        <Shortcut icon="inbox" label="Inbox" onPress={() => router.navigate("/inbox")} />
-        <Shortcut icon="doneAll" label="Progress" onPress={() => router.navigate("/reports")} />
-      </Reveal>
-      <Invitations />
       <ReminderPrompt
         upcoming={
           remaining.filter((t) => Date.parse(t.scheduledAt!) > now.getTime()).length
@@ -198,208 +211,21 @@ export default function Today() {
         </>
       ) : (
         <>
-          <Reveal delay={80}>
-            <Card dark style={{ gap: 18, padding: 24 }}>
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                }}
-              >
-                <Eyebrow light>
-                  {next
-                    ? Date.parse(next.scheduledAt!) <= now.getTime()
-                      ? "YOUR NEXT STEP"
-                      : `UP NEXT · ${localParts(new Date(next.scheduledAt!), preferences.timezone).clock}`
-                    : allDone
-                      ? "YOU DID IT"
-                      : "ROOM FOR WHAT’S NEXT"}
-                </Eyebrow>
-                <Text
-                  style={{
-                    fontFamily: theme.fonts.semibold,
-                    fontSize: 12.5,
-                    color: theme.darkMuted,
-                  }}
-                >
-                  {completed}/{today.length} done
-                </Text>
-              </View>
-              <Heading light serif size={36}>
-                {next?.title ||
-                  (completed === today.length
-                    ? "Your day’s work is done."
-                    : "Nothing scheduled right now.")}
-              </Heading>
-              {!!next?.note && <Body light>{next.note}</Body>}
-              {next ? (
-                <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
-                  <Chip icon="timer" tone="dark">
-                    {next.duration} minutes
-                  </Chip>
-                  <Chip icon={next.fixed !== false ? "event" : "bolt"} tone="dark">
-                    {next.fixed !== false
-                      ? "Fixed appointment"
-                      : "One thing at a time"}
-                  </Chip>
-                </View>
-              ) : (
-                <Body light>
-                  {waiting.length
-                    ? "Some tasks are waiting for space. Adjust the plan when you’re ready."
-                    : "Take a moment to enjoy the space you’ve made."}
-                </Body>
-              )}
-              {!!next?.steps?.length && (
-                <View
-                  style={{
-                    gap: 10,
-                    padding: 16,
-                    borderRadius: 18,
-                    backgroundColor: "rgba(255,255,255,0.05)",
-                    borderWidth: 1,
-                    borderColor: theme.darkLine,
-                  }}
-                >
-                  {next.steps.map((step, i) => (
-                    <View
-                      key={i}
-                      style={{ flexDirection: "row", gap: 12, alignItems: "flex-start" }}
-                    >
-                      <View
-                        style={{
-                          width: 22,
-                          height: 22,
-                          borderRadius: 11,
-                          alignItems: "center",
-                          justifyContent: "center",
-                          backgroundColor: "rgba(185,230,211,0.14)",
-                        }}
-                      >
-                        <Text
-                          style={{
-                            fontFamily: theme.fonts.bold,
-                            fontSize: 11,
-                            color: theme.mint,
-                          }}
-                        >
-                          {i + 1}
-                        </Text>
-                      </View>
-                      <Text
-                        style={{
-                          flex: 1,
-                          fontFamily: theme.fonts.regular,
-                          fontSize: 14.5,
-                          lineHeight: 22,
-                          color: theme.surface,
-                          opacity: 0.88,
-                        }}
-                      >
-                        {step}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-              )}
-              <Progress
-                completed={completed}
-                total={today.length}
-                dark
-                showLabel={false}
-              />
-              {next && <NextStepActions key={next.id} task={next} />}
-            </Card>
-          </Reveal>
-          <Reveal delay={160} style={{ flexDirection: "row", gap: 10 }}>
-            <Stat icon="doneAll" value={`${completed}/${today.length}`} label="Done" />
-            <Stat icon="timer" value={`${minutesLeft}`} label="Minutes left" />
-            <Stat
-              icon="history"
-              value={`${waiting.length}`}
-              label="Waiting"
-              tint={waiting.length ? theme.accent : undefined}
-            />
-          </Reveal>
-          <Reveal delay={220} style={{ flexDirection: "row", gap: 10, flexWrap: "wrap" }}>
-            <Button
-              title="Tell Tempo more"
-              icon="add"
-              variant="secondary"
-              compact
-              style={{ flex: 1, minWidth: 130 }}
-              onPress={() => router.navigate("/planning")}
-            />
-            <Action title="Replan from now" icon="sync" variant="secondary" compact style={{ flex: 1, minWidth: 130 }} run={async () => {
-              const result = await replanFromNow();
-              setNow(new Date());
-              setMessage(result);
-            }} />
-            <Button
-              title="My day changed"
-              icon="sync"
-              variant="secondary"
-              compact
-              style={{ flex: 1, minWidth: 130 }}
-              onPress={() => setAdjusting(!adjusting)}
-            />
-          </Reveal>
-          {adjusting && <DayAdjustment key={day} day={day} onClose={() => setAdjusting(false)} />}
-          {!!message && <Notice tone="mint">{message}</Notice>}
-          {!!today.length &&
-            (confirmClear ? (
-              <View style={{ gap: 10, padding: 14, borderRadius: 16, backgroundColor: theme.dangerSoft }}>
-                <Text style={{ fontFamily: theme.fonts.medium, fontSize: 13.5, lineHeight: 20, color: theme.danger }}>
-                  Delete all {today.length} {today.length === 1 ? "task" : "tasks"} on this day, done or not? This
-                  can’t be undone. Repeating tasks only skip this day.
-                </Text>
-                <View style={{ flexDirection: "row", gap: 10 }}>
-                  <Button title="Keep them" variant="light" compact style={{ flex: 1 }} onPress={() => setConfirmClear(false)} />
-                  <Action
-                    title="Delete all"
-                    busyTitle="Deleting…"
-                    icon="delete"
-                    compact
-                    style={{ flex: 1 }}
-                    run={async () => {
-                      await useTempo.getState().removeTasks(today.map((t) => t.id));
-                      setConfirmClear(false);
-                      setMessage("Day cleared. Tell Tempo your new plan whenever you’re ready.");
-                    }}
-                  />
-                </View>
-              </View>
-            ) : (
-              <Button
-                title="Clear this day"
-                icon="delete"
-                variant="ghost"
-                compact
-                onPress={() => {
-                  setMessage("");
-                  setConfirmClear(true);
-                }}
-              />
-            ))}
           {!!missed.length && (
-            <Card>
+            <Card style={{ backgroundColor: theme.sunSoft, borderColor: "transparent" }}>
               <SectionHeader
                 icon="history"
-                title="Earlier appointments"
-                detail="These times have passed. Mark them done or edit the time if plans changed."
+                title="Did these happen?"
+                detail="Their time has passed. Mark them done, or ask Tempo to find a new time."
               />
               {missed.map((t) => (
                 <TaskLine
                   key={t.id}
                   title={t.title}
-                  detail={
-                    localParts(new Date(t.scheduledAt!), preferences.timezone)
-                      .clock
-                  }
+                  detail={localParts(new Date(t.scheduledAt!), preferences.timezone).clock}
                 >
                   <Action
-                    title="Mark done"
+                    title="Done"
                     icon="check"
                     compact
                     run={async () => {
@@ -410,31 +236,34 @@ export default function Today() {
                       });
                     }}
                   />
+                  <Button
+                    title="Move"
+                    variant="light"
+                    compact
+                    onPress={() => talk(`I didn't do ${t.title}. Find it a new time.`)}
+                  />
                 </TaskLine>
               ))}
             </Card>
           )}
-          <View style={{ marginTop: 12 }}>
-            <SectionHeader
-              icon="calendar"
-              title="Your day at a glance"
-              detail={`${preferences.timezone} · appointments stay fixed · gaps leave room to reset`}
-            />
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 6 }}>
+            <Text style={{ fontFamily: theme.fonts.heavy, fontSize: 19, color: theme.ink, letterSpacing: -0.3 }}>
+              {day === todayDate ? "Today" : day}
+            </Text>
+            <Text style={{ fontFamily: theme.fonts.semibold, fontSize: 13, color: theme.muted }}>
+              {completed}/{today.length} done · {minutesLeft} min left
+            </Text>
           </View>
-          <DayTimeline
-            blocks={blocks}
-            timezone={preferences.timezone}
-            now={now.getTime()}
-          />
+          <DayList blocks={blocks} timezone={preferences.timezone} now={now.getTime()} />
           {!!waiting.length && (
             <Card style={{ backgroundColor: theme.accentSoft, borderColor: "transparent" }}>
               <SectionHeader
                 icon="history"
-                title="Waiting for a little space"
-                detail="These tasks are saved. You don’t have to squeeze everything into today."
+                title="Waiting for a time"
+                detail="Saved, but not placed yet. Replan to fit them in, or push them to tomorrow."
               />
               {waiting.map((t) => (
-                <TaskLine key={t.id} title={t.title} detail={`${t.duration} min`}>
+                <TaskLine key={t.id} title={t.title} detail={t.note || `${t.duration} min`}>
                   <Action
                     title="Tomorrow"
                     trailingIcon="arrow"
@@ -458,17 +287,77 @@ export default function Today() {
               ))}
             </Card>
           )}
+          <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
+            <Action title="Replan from now" icon="sync" variant="secondary" compact style={{ flexGrow: 1 }} run={async () => {
+              const result = await replanFromNow();
+              setNow(new Date());
+              setMessage(result);
+            }} />
+            <Button
+              title="My day changed"
+              icon="tune"
+              variant="secondary"
+              compact
+              style={{ flexGrow: 1 }}
+              onPress={() => setAdjusting(!adjusting)}
+            />
+            <Button
+              title="Add more"
+              icon="add"
+              variant="secondary"
+              compact
+              style={{ flexGrow: 1 }}
+              onPress={() => router.navigate("/planning")}
+            />
+          </View>
+          {adjusting && <DayAdjustment key={day} day={day} onClose={() => setAdjusting(false)} />}
+          {!!message && <Notice tone="mint">{message}</Notice>}
+          {confirmClear ? (
+            <View style={{ gap: 10, padding: 14, borderRadius: 16, backgroundColor: theme.dangerSoft }}>
+              <Text style={{ fontFamily: theme.fonts.medium, fontSize: 13.5, lineHeight: 20, color: theme.danger }}>
+                Delete all {today.length} {today.length === 1 ? "task" : "tasks"} on this day, done or not? This
+                can’t be undone. Repeating tasks only skip this day.
+              </Text>
+              <View style={{ flexDirection: "row", gap: 10 }}>
+                <Button title="Keep them" variant="light" compact style={{ flex: 1 }} onPress={() => setConfirmClear(false)} />
+                <Action
+                  title="Delete all"
+                  busyTitle="Deleting…"
+                  icon="delete"
+                  compact
+                  style={{ flex: 1 }}
+                  run={async () => {
+                    await useTempo.getState().removeTasks(today.map((t) => t.id));
+                    setConfirmClear(false);
+                    setMessage("Day cleared. Tell Tempo your new plan whenever you’re ready.");
+                  }}
+                />
+              </View>
+            </View>
+          ) : (
+            <Button
+              title="Clear this day"
+              icon="delete"
+              variant="ghost"
+              compact
+              style={{ alignSelf: "flex-start" }}
+              onPress={() => {
+                setMessage("");
+                setConfirmClear(true);
+              }}
+            />
+          )}
           <TeamTasks />
           <ProjectStrip />
           <DoneToday tasks={doneToday} />
-          <Button
-            title="Edit tasks or appointment times"
-            icon="edit"
-            variant="ghost"
-            onPress={() => router.navigate("/tasks")}
-          />
         </>
       )}
+      <View style={{ flexDirection: "row", gap: 10, marginTop: 6 }}>
+        <Shortcut icon="routine" label="My week" onPress={() => router.navigate("/my-week")} />
+        <Shortcut icon="event" label="Calendar" onPress={() => router.navigate("/calendar")} />
+        <Shortcut icon="inbox" label="Inbox" onPress={() => router.navigate("/inbox")} />
+        <Shortcut icon="list" label="All tasks" onPress={() => router.navigate("/tasks")} />
+      </View>
       <DailyWrapUp key={day} day={day} />
       {!!overdue.length && (
         <Card>
@@ -503,6 +392,27 @@ export default function Today() {
         </Card>
       )}
     </Screen>
+  );
+}
+
+function StatusPill({ icon, tint, label }: { icon: IconName; tint: string; label: string }) {
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        paddingHorizontal: 11,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: theme.surface,
+        borderWidth: 1,
+        borderColor: theme.line,
+      }}
+    >
+      <Icon name={icon} size={15} color={tint} />
+      <Text style={{ fontFamily: theme.fonts.semibold, fontSize: 12.5, color: theme.inkSoft }}>{label}</Text>
+    </View>
   );
 }
 
@@ -547,57 +457,6 @@ function Shortcut({
         {label}
       </Text>
     </Tap>
-  );
-}
-
-function Stat({
-  icon,
-  value,
-  label,
-  tint,
-}: {
-  icon: IconName;
-  value: string;
-  label: string;
-  tint?: string;
-}) {
-  return (
-    <View
-      style={{
-        flex: 1,
-        padding: 14,
-        gap: 10,
-        borderRadius: 20,
-        backgroundColor: theme.surface,
-        borderWidth: 1,
-        borderColor: theme.line,
-        ...shadow.soft,
-      }}
-    >
-      <Icon name={icon} size={18} color={tint ?? theme.muted} />
-      <View style={{ gap: 1 }}>
-        <Text
-          style={{
-            fontFamily: theme.fonts.display,
-            fontSize: 30,
-            lineHeight: 32,
-            color: tint ?? theme.ink,
-          }}
-        >
-          {value}
-        </Text>
-        <Text
-          numberOfLines={1}
-          style={{
-            fontFamily: theme.fonts.semibold,
-            fontSize: 12,
-            color: theme.muted,
-          }}
-        >
-          {label}
-        </Text>
-      </View>
-    </View>
   );
 }
 
