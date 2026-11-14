@@ -8,15 +8,14 @@ import { VoiceOrb } from "./voice-orb";
 const speech = requireOptionalNativeModule<ExpoSpeechRecognitionModuleType>(
   "ExpoSpeechRecognition",
 );
-export function VoiceInput({
+/** Speech-to-text for one field: words are appended to `value` as the person talks. */
+export function useVoice({
   value,
   onChange,
-  disabled,
   onListening,
 }: {
   value: string;
   onChange: (v: string) => void;
-  disabled?: boolean;
   onListening: (v: boolean) => void;
 }) {
   const [listening, setListening] = useState(false);
@@ -76,6 +75,64 @@ export function VoiceInput({
   useEffect(() => {
     if (!focused) speech?.abort();
   }, [focused]);
+  const toggle = async () => {
+    if (!speech) {
+      setError(
+        "Voice isn’t included in this version of the app (for example, Expo Go). Install the latest Tempo app, or use your keyboard’s microphone to dictate here.",
+      );
+      return;
+    }
+    if (listening) {
+      speech.stop();
+      return;
+    }
+    setError("");
+    setStarting(true);
+    callbacks.current.onListening(true);
+    try {
+      if (!speech.isRecognitionAvailable())
+        throw new Error(
+          "Speech recognition is unavailable on this device. Try keyboard dictation or type below.",
+        );
+      const permission = await speech.requestPermissionsAsync();
+      if (!permission.granted)
+        throw new Error(
+          "Allow microphone and speech recognition in Settings, or type below.",
+        );
+      prefix.current = value.trim();
+      final.current = "";
+      speech.start({
+        lang: "en-US",
+        interimResults: true,
+        continuous: true,
+        addsPunctuation: true,
+        iosTaskHint: "dictation",
+      });
+    } catch (e) {
+      setError(
+        e instanceof Error
+          ? e.message
+          : "Could not start voice. Try typing below.",
+      );
+      setStarting(false);
+      callbacks.current.onListening(false);
+    }
+  };
+  return { listening, starting, error, toggle };
+}
+
+export function VoiceInput({
+  value,
+  onChange,
+  disabled,
+  onListening,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  disabled?: boolean;
+  onListening: (v: boolean) => void;
+}) {
+  const { listening, starting, error, toggle } = useVoice({ value, onChange, onListening });
   return (
     <VoiceOrb
       listening={listening}
@@ -87,49 +144,7 @@ export function VoiceInput({
           ? "Speak naturally. Your words appear below as you talk."
           : "Speak in one take, or type below. Speech recognition uses your device’s speech service and may need internet."
       }
-      onPress={async () => {
-        if (!speech) {
-          setError(
-            "Voice isn’t included in this version of the app (for example, Expo Go). Install the latest Tempo app, or use your keyboard’s microphone to dictate here.",
-          );
-          return;
-        }
-        if (listening) {
-          speech.stop();
-          return;
-        }
-        setError("");
-        setStarting(true);
-        callbacks.current.onListening(true);
-        try {
-          if (!speech.isRecognitionAvailable())
-            throw new Error(
-              "Speech recognition is unavailable on this device. Try keyboard dictation or type below.",
-            );
-          const permission = await speech.requestPermissionsAsync();
-          if (!permission.granted)
-            throw new Error(
-              "Allow microphone and speech recognition in Settings, or type below.",
-            );
-          prefix.current = value.trim();
-          final.current = "";
-          speech.start({
-            lang: "en-US",
-            interimResults: true,
-            continuous: true,
-            addsPunctuation: true,
-            iosTaskHint: "dictation",
-          });
-        } catch (e) {
-          setError(
-            e instanceof Error
-              ? e.message
-              : "Could not start voice. Try typing below.",
-          );
-          setStarting(false);
-          callbacks.current.onListening(false);
-        }
-      }}
+      onPress={toggle}
     />
   );
 }

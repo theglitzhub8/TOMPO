@@ -14,6 +14,7 @@ import {
   Notice,
   Progress,
   Reveal,
+  Tap,
   theme,
   type IconName,
 } from "../../components/ui";
@@ -29,6 +30,7 @@ import {
   TeamTasks,
 } from "../../components/today-extras";
 import { ReminderPrompt } from "../../components/reminder-card";
+import { TempoSays, helperMessage } from "../../components/helper";
 import { replanFromNow } from "../../lib/replan";
 import { shadow } from "../../design/tokens";
 import { localParts } from "../../../../../packages/core/src/scheduling";
@@ -123,6 +125,29 @@ export default function Today() {
     hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
   const minutesLeft = remaining.reduce((sum, t) => sum + t.duration, 0);
   const allDone = remaining.length === 0 && completed === today.length;
+  const clockOf = (t?: { scheduledAt: string | null }) =>
+    t?.scheduledAt ? localParts(new Date(t.scheduledAt), preferences.timezone).clock : undefined;
+  const helper = helperMessage({
+    name: firstName,
+    hour,
+    isToday: day === todayDate,
+    hasDay,
+    next,
+    nextClock: clockOf(next),
+    minutesUntilNext: next ? Math.ceil((Date.parse(next.scheduledAt!) - now.getTime()) / 60000) : 0,
+    missed,
+    missedClock: clockOf(missed[0]),
+    remaining: remaining.length,
+    minutesLeft,
+    waiting: waiting.length,
+    overdue: overdue.length,
+    allDone: hasDay && allDone,
+    replan: async () => {
+      const result = await replanFromNow();
+      setNow(new Date());
+      return result;
+    },
+  });
   return (
     <Screen
       eyebrow={day === todayDate ? "ONE DAY AT A TIME" : `YOUR PLAN · ${day}`}
@@ -132,11 +157,6 @@ export default function Today() {
           : "A little head start."
       }
       titleAccent={day === todayDate && firstName ? `${firstName}.` : undefined}
-      subtitle={
-        hasDay
-          ? "Your day is laid out. Take it one thing at a time."
-          : "Tell me what you need to do. I’ll help you find time for it."
-      }
     >
       {day !== todayDate && (
         <Button
@@ -154,10 +174,15 @@ export default function Today() {
         </Notice>
       ))}
       {!!recurrenceError && <Notice tone="danger">{recurrenceError}</Notice>}
-      <View style={{flexDirection:"row",gap:8,flexWrap:"wrap"}}>
-        <Button title="Plan the week" compact variant="secondary" onPress={()=>router.navigate("/week")}/>
-        <Button title="Activity inbox" compact variant="secondary" onPress={()=>router.navigate("/inbox")}/>
-      </View>
+      <Reveal delay={40}>
+        <TempoSays text={helper.text} suggestions={helper.suggestions} />
+      </Reveal>
+      <Reveal delay={90} style={{ flexDirection: "row", gap: 10 }}>
+        <Shortcut icon="calendar" label="Week" onPress={() => router.navigate("/week")} />
+        <Shortcut icon="event" label="Calendar" onPress={() => router.navigate("/calendar")} />
+        <Shortcut icon="inbox" label="Inbox" onPress={() => router.navigate("/inbox")} />
+        <Shortcut icon="doneAll" label="Progress" onPress={() => router.navigate("/reports")} />
+      </Reveal>
       <Invitations />
       <ReminderPrompt
         upcoming={
@@ -298,13 +323,6 @@ export default function Today() {
             />
           </Reveal>
           <Reveal delay={220} style={{ flexDirection: "row", gap: 10, flexWrap: "wrap" }}>
-            <Button
-              title="Talk to Tempo"
-              icon="mic"
-              compact
-              style={{ flex: 1, minWidth: 130 }}
-              onPress={() => router.navigate("/talk")}
-            />
             <Button
               title="Tell Tempo more"
               icon="add"
@@ -485,6 +503,50 @@ export default function Today() {
         </Card>
       )}
     </Screen>
+  );
+}
+
+function Shortcut({
+  icon,
+  label,
+  onPress,
+}: {
+  icon: IconName;
+  label: string;
+  onPress: () => void;
+}) {
+  return (
+    <Tap
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={onPress}
+      style={{
+        flex: 1,
+        alignItems: "center",
+        gap: 6,
+        paddingVertical: 12,
+        borderRadius: 18,
+        backgroundColor: theme.surface,
+        borderWidth: 1,
+        borderColor: theme.line,
+      }}
+    >
+      <View
+        style={{
+          width: 36,
+          height: 36,
+          borderRadius: 18,
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: theme.accentSoft,
+        }}
+      >
+        <Icon name={icon} size={19} color={theme.accentDeep} />
+      </View>
+      <Text style={{ fontFamily: theme.fonts.semibold, fontSize: 12, color: theme.inkSoft }}>
+        {label}
+      </Text>
+    </Tap>
   );
 }
 

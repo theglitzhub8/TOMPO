@@ -11,7 +11,8 @@ const destinations: {
 }[] = [
   { path: "/", title: "Today", icon: "home" },
   { path: "/projects", title: "Projects", icon: "folder" },
-  { path: "/planning", title: "Tell Tempo", icon: "mic", primary: true },
+  // The helper sits in the middle: one tap to talk to Tempo.
+  { path: "/talk", title: "Talk to Tempo", icon: "mic", primary: true },
   { path: "/tasks", title: "Tasks", icon: "list" },
   { path: "/settings", title: "Settings", icon: "tune" },
 ];
