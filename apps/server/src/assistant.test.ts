@@ -70,6 +70,37 @@ test("only well-formed actions on the person's own tasks survive", () => {
   assert.throws(() => validateAssistantReply({ reply: "", actions: [] }, known));
 });
 
+test("projects, notes and week days come through; bad ones are dropped", () => {
+  const known = new Set(["t1"]);
+  const reply = validateAssistantReply(
+    {
+      reply: "Here's your launch, spread over the week.",
+      actions: [
+        { type: "project", title: "Website launch" },
+        { type: "project", title: "" },
+        {
+          type: "add", title: "Write homepage copy", note: "Clear words sell the product.", duration: 60,
+          day: "2026-11-16", clock: null, priority: "normal", project: "Website launch", steps: [], dueDay: "2026-11-20",
+        },
+        { type: "add", title: "Bad deadline", duration: 30, dueDay: "2026-11-31" },
+        { type: "update", id: "t1", project: "Website launch", note: "Warm up first." },
+        { type: "update", id: "t1", project: 5 },
+      ],
+    },
+    known,
+  );
+  assert.deepEqual(reply.actions, [
+    { type: "project", title: "Website launch" },
+    {
+      type: "add", title: "Write homepage copy", note: "Clear words sell the product.", duration: 60,
+      day: "2026-11-16", clock: null, priority: "normal", project: "Website launch", steps: [], dueDay: "2026-11-20",
+    },
+    { type: "update", id: "t1", project: "Website launch", note: "Warm up first." },
+  ]);
+  assert.equal(validateAssistantInput({ ...base, projects: ["Home"], focus: "project" }).focus, "project");
+  assert.throws(() => validateAssistantInput({ ...base, projects: [42] }));
+});
+
 test("the assistant calls Moonshot and returns the checked proposal", async (t) => {
   const saved = { ...process.env };
   process.env.MOONSHOT_API_KEY = "test-key";
@@ -103,6 +134,7 @@ test("the assistant calls Moonshot and returns the checked proposal", async (t) 
   assert.equal(sent.body.model, "kimi-test");
   assert.equal(sent.body.messages[0].role, "system");
   assert.match(sent.body.messages[0].content, /check-in for task id t1/);
+  assert.match(sent.body.messages[0].content, /2026-11-16 Monday/);
   assert.equal(sent.body.messages[1].role, "user");
   assert.deepEqual(answer, {
     simulation: false,

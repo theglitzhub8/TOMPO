@@ -215,6 +215,18 @@ export function DayTimeline({
                     </Chip>
                   )}
                 </View>
+                {!done && !!block.task?.note && (
+                  <Text
+                    style={{
+                      fontFamily: theme.fonts.regular,
+                      fontSize: 13.5,
+                      lineHeight: 20,
+                      color: theme.muted,
+                    }}
+                  >
+                    {block.task.note}
+                  </Text>
+                )}
                 {!done &&
                   block.task?.steps?.map((step, i) => (
                     <View

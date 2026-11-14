@@ -17,6 +17,8 @@ export type AssistantAction =
       priority: Priority;
       project: string | null;
       steps: string[];
+      note: string | null;
+      dueDay: string | null;
     }
   | {
       type: "update";
@@ -26,7 +28,10 @@ export type AssistantAction =
       day?: string;
       clock?: string | null;
       priority?: Priority;
+      note?: string;
+      project?: string | null;
     }
+  | { type: "project"; title: string }
   | { type: "complete" | "reopen" | "delete"; id: string }
   | { type: "replan" };
 export type AssistantReply = {
@@ -42,6 +47,7 @@ const recent = 2 * 86400000;
 export async function askTempo(
   messages: Turn[],
   checkin?: { taskId: string; kind: CheckinKind },
+  focus?: "project",
 ) {
   const state = useTempo.getState();
   const zone = state.preferences.timezone;
@@ -74,6 +80,8 @@ export async function askTempo(
     timezone: zone,
     mode: state.preferences.mode,
     tasks,
+    projects: state.projects.slice(0, 200).map((p) => p.title),
+    focus: focus ?? null,
     checkin: checkin ?? null,
   });
 }
@@ -85,8 +93,10 @@ const timeText = (day: string | null | undefined, clock: string | null | undefin
 export function describe(action: AssistantAction, tasks: Task[]) {
   const name = (taskId: string) => tasks.find((t) => t.id === taskId)?.title ?? "a task";
   switch (action.type) {
+    case "project":
+      return `Create project “${action.title}”`;
     case "add":
-      return `Add “${action.title}” · ${action.duration} min${action.clock || action.day ? ` · ${timeText(action.day, action.clock)}` : ""}`;
+      return `Add “${action.title}” · ${action.duration} min${action.clock || action.day ? ` · ${timeText(action.day, action.clock)}` : ""}${action.project ? ` · ${action.project}` : ""}`;
     case "complete":
       return `Mark “${name(action.id)}” done`;
     case "reopen":
@@ -103,6 +113,8 @@ export function describe(action: AssistantAction, tasks: Task[]) {
           ? "make flexible"
           : (action.clock || action.day) && `move to ${timeText(action.day, action.clock)}`,
         action.priority && `${action.priority} priority`,
+        action.project === null ? "remove from its project" : action.project && `move to project ${action.project}`,
+        action.note && "new note",
       ].filter(Boolean);
       return `Change “${name(action.id)}”: ${parts.join(", ")}`;
     }
@@ -135,6 +147,10 @@ export async function applyActions(actions: AssistantAction[]) {
       : { ...task, scheduledAt: null, fixed: false, plannedDay: day };
   for (const action of actions) {
     if (action.type === "replan") continue;
+    if (action.type === "project") {
+      project(action.title);
+      continue;
+    }
     if (action.type === "add") {
       const task = place(
         {
@@ -146,6 +162,8 @@ export async function applyActions(actions: AssistantAction[]) {
           completedAt: null,
           scheduledAt: null,
           steps: action.steps,
+          ...(action.note ? { note: action.note } : {}),
+          ...(action.dueDay ? { dueDay: action.dueDay } : {}),
           ...(action.priority !== "normal" ? { priority: action.priority } : {}),
         },
         action.day ?? today,
@@ -175,6 +193,8 @@ export async function applyActions(actions: AssistantAction[]) {
       ...(action.title ? { title: action.title } : {}),
       ...(action.duration ? { duration: action.duration } : {}),
       ...(action.priority ? { priority: action.priority } : {}),
+      ...(action.note ? { note: action.note } : {}),
+      ...(action.project !== undefined ? { projectId: project(action.project) } : {}),
     };
     if (action.day !== undefined || action.clock !== undefined) {
       const at = task.scheduledAt ? localParts(new Date(task.scheduledAt), zone) : null;

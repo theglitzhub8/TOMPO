@@ -30,7 +30,7 @@ export function recurringOccurrences(tasks: Task[], day: string, timezone: strin
         id, title: root.title, projectId: root.projectId, duration: root.duration,
         status: "pending", completedAt: null, fixed: !!clock,
         scheduledAt: clock ? localInstant(date, clock, timezone).toISOString() : null,
-        plannedDay: date, steps: root.steps, seriesId: root.id, occurrenceDay: date,
+        plannedDay: date, steps: root.steps, ...(root.note ? { note: root.note } : {}), seriesId: root.id, occurrenceDay: date,
       };
       validate("task", occurrence);
       existing.add(id);

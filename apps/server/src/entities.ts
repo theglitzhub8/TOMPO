@@ -123,7 +123,8 @@ export function validateChanges(input: unknown): Change[] {
       Number.isFinite(Date.parse(`${v}T12:00:00Z`)) && new Date(`${v}T12:00:00Z`).toISOString().slice(0, 10) === v;
     if ((p.dueDay !== undefined && !day(p.dueDay)) ||
       (p.priority !== undefined && !["low", "normal", "high"].includes(p.priority)) ||
-      (p.startedAt !== undefined && !timestamp(p.startedAt))) throw new Error("Invalid task deadline, priority, or start time.");
+      (p.startedAt !== undefined && !timestamp(p.startedAt)) ||
+      (p.note !== undefined && (typeof p.note !== "string" || p.note.length > 300))) throw new Error("Invalid task deadline, priority, or start time.");
     if (p.recurrence !== undefined && (!p.recurrence || !Array.isArray(p.recurrence.days) ||
       !p.recurrence.days.length || p.recurrence.days.length > 7 ||
       p.recurrence.days.some((d: unknown) => !Number.isInteger(d) || Number(d) < 0 || Number(d) > 6) ||
@@ -152,6 +153,7 @@ export function validateChanges(input: unknown): Change[] {
         ...(p.fixed === undefined ? {} : { fixed: p.fixed }),
         ...(p.plannedDay === undefined ? {} : { plannedDay: p.plannedDay }),
         ...(p.steps === undefined ? {} : { steps: p.steps }),
+        ...(p.note === undefined ? {} : { note: p.note }),
         ...(p.recurrence === undefined ? {} : { recurrence: { days: [...new Set(p.recurrence.days)], startDay: p.recurrence.startDay,
           ...(p.recurrence.skippedDays === undefined ? {} : { skippedDays: [...new Set(p.recurrence.skippedDays)] }) } }),
         ...(p.seriesId === undefined ? {} : { seriesId: p.seriesId, occurrenceDay: p.occurrenceDay }),

@@ -7,7 +7,7 @@ export type AiSection =
   | "performance-review";
 const schemas: Record<AiSection, string> = {
   "task-extraction":
-    'Turn one natural-language description of the person\'s day into precise, distinct tasks. Return {"tasks":[{"title":string,"duration":integer,"clock":string|null,"steps":string[],"dueDay":string|null,"priority":"low"|"normal"|"high","project":string|null}],"notes":string[]}. ' +
+    'Turn one natural-language description of the person\'s day, or their week, into precise, distinct tasks. Return {"tasks":[{"title":string,"note":string,"duration":integer,"day":string|null,"clock":string|null,"steps":string[],"dueDay":string|null,"priority":"low"|"normal"|"high","project":string|null}],"notes":string[]}. ' +
     "Rules, in order of importance: " +
     "(1) Capture every activity the person mentions, including personal ones like sleeping, exercise, cleaning and cooking, as its own task, in the order they will happen. Never drop, merge or invent activities. " +
     "(2) Durations: use exactly the length the person states. If an activity runs between two stated times (sleep at 10:00, wake up at 12:00), the duration is the difference (120). Estimate realistic lengths only when nothing is stated. " +
@@ -16,7 +16,9 @@ const schemas: Record<AiSection, string> = {
     "(5) Titles: short, clean imperative phrases in the person\'s language with speech-recognition mistakes corrected (\"Exercise\", \"Clean the house\", \"Prepare food\"); max 200 characters. " +
     "(6) Add 2–5 concrete steps only for complex work; simple activities get none. " +
     "(7) dueDay only for an explicit deadline on another day, resolved to YYYY-MM-DD from the supplied day and timezone; a deadline is never a start time. Priority normal unless the person says urgent or important, low if they say it can wait. Project only when the person names one. " +
-    "(8) Put short questions about anything genuinely ambiguous in notes. No more than 60 tasks.",
+    "(8) Days: \"day\" is the date the task happens. Use null for the supplied day. When the person talks about other days (\"on Monday I have…\", \"Wednesday I need to…\", \"tomorrow\", \"this weekend\"), give each of those tasks its date from the supplied calendar, never a date before the supplied day. A weekday name means its next date on or after the supplied day. Timing rules (2) and (3) apply within each day, and tasks on a day with no times stay flexible (clock null) so they can be planned on that day. " +
+    "(9) note: one short, friendly sentence (under 140 characters) on why the task matters or how to do it well, specific to this task and not repeating the title (\"A quick sweat wakes your body up for the day.\", \"Clear one room at a time so it feels lighter.\"). " +
+    "(10) Put short questions about anything genuinely ambiguous in notes. No more than 100 tasks.",
   "priority-ranking":
     'Return {"items":[{"id":string,"priority":number,"reason":string}]}',
   "daily-plan":
@@ -85,7 +87,7 @@ export function validateAiContent(content: any, section: AiSection) {
       !content ||
       !Array.isArray(content.tasks) ||
       !content.tasks.length ||
-      content.tasks.length > 60
+      content.tasks.length > 100
     )
       throw new Error("AI returned no usable tasks");
     for (const t of content.tasks) {
@@ -98,6 +100,8 @@ export function validateAiContent(content: any, section: AiSection) {
           !Number.isFinite(Date.parse(t.dueDay + "T12:00:00Z")) || new Date(t.dueDay + "T12:00:00Z").toISOString().slice(0,10) !== t.dueDay)) ||
         (t.priority !== undefined && !["low", "normal", "high"].includes(t.priority)) ||
         (t.project != null && (typeof t.project !== "string" || t.project.length > 200)) ||
+        (t.day != null && !realDay(t.day)) ||
+        (t.note != null && typeof t.note !== "string") ||
         !Number.isInteger(t.duration) ||
         t.duration < 1 ||
         t.duration > 1440 ||
@@ -116,6 +120,21 @@ export function validateAiContent(content: any, section: AiSection) {
   return content;
 }
 
+const realDay = (v: unknown) =>
+  typeof v === "string" &&
+  /^\d{4}-\d{2}-\d{2}$/.test(v) &&
+  Number.isFinite(Date.parse(`${v}T12:00:00Z`)) &&
+  new Date(`${v}T12:00:00Z`).toISOString().slice(0, 10) === v;
+
+/** The next two weeks as "YYYY-MM-DD Weekday", so the model never has to work out dates. */
+export function calendar(day: string, days = 14) {
+  const start = Date.parse(`${day}T12:00:00Z`);
+  return Array.from({ length: days }, (_, i) => {
+    const date = new Date(start + i * 86400000);
+    return `${date.toISOString().slice(0, 10)} ${date.toLocaleDateString("en-US", { weekday: "long", timeZone: "UTC" })}`;
+  });
+}
+
 export async function askAi(section: AiSection, input: unknown) {
   if (!aiConfigured())
     return {
@@ -127,6 +146,8 @@ export async function askAi(section: AiSection, input: unknown) {
   const content = await chatJson(
     `You are Tempo, a helpful day planner. ${schemas[section]} Never modify protected routines or confirmed appointments without explicit permission. Return JSON only, without markdown fences.`,
     [{ role: "user", content: JSON.stringify(input) }],
+    // A whole week with notes needs more room than one day.
+    section === "task-extraction" ? 12000 : 6000,
   );
   return {
     simulation: false,

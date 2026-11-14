@@ -34,7 +34,7 @@ export default function Tasks() {
   const [filter, setFilter] = useState<Filter>("all");
   const active = open ?? focus;
   const inFilter = tasks.filter(t => (filter === "all" || t.projectId === filter) &&
-    `${t.title} ${t.steps?.join(" ") || ""} ${projects.find(p => p.id === t.projectId)?.title || ""} ${t.dueDay || ""}`.toLowerCase().includes(query.trim().toLowerCase()));
+    `${t.title} ${t.note || ""} ${t.steps?.join(" ") || ""} ${projects.find(p => p.id === t.projectId)?.title || ""} ${t.dueDay || ""}`.toLowerCase().includes(query.trim().toLowerCase()));
   const visible = inFilter
     .filter((t) => t.status === "pending")
     .sort((a, b) => (a.scheduledAt || "z").localeCompare(b.scheduledAt || "z"));

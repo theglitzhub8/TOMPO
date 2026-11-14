@@ -21,7 +21,12 @@ export async function understandDay(
         content: { tasks: unknown[]; notes: unknown[] };
       }>("/v1/plan", { text, day, timezone });
     if (data.simulation) throw new Error("AI is not configured");
-    const items = validateCapture(data.content);
+    const moved: string[] = [];
+    // Tasks for the planned day carry no day; a day already gone lands on it.
+    const items = validateCapture(data.content).map(({ day: on, ...item }) => {
+      if (on && on < day) moved.push(`“${item.title}” was for ${on}, which has passed, so it’s on this plan.`);
+      return on && on > day ? { ...item, day: on } : item;
+    });
     const notes = Array.isArray(data.content.notes)
       ? data.content.notes
           .filter(
@@ -34,6 +39,7 @@ export async function understandDay(
       items,
       notes: [
         "Task lengths are estimates. Review the plan before saving.",
+        ...moved,
         ...notes,
       ],
       source: "ai",

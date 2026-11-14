@@ -27,7 +27,9 @@ import {
 const muteKey = "tempo-assistant-muted";
 
 export default function Talk() {
-  const params = useLocalSearchParams<{ task?: string; checkin?: string }>();
+  const params = useLocalSearchParams<{ task?: string; checkin?: string; focus?: string }>();
+  // Opened from Projects: Tempo sets up a project from what the person describes.
+  const focus = params.focus === "project" ? "project" : undefined;
   const tasks = useTempo((s) => s.tasks);
   const [turns, setTurns] = useState<Turn[]>([]);
   const [draft, setDraft] = useState("");
@@ -63,7 +65,7 @@ export default function Talk() {
       setError("");
       setProposal([]);
       try {
-        const answer = await askTempo(next, checkin);
+        const answer = await askTempo(next, checkin, focus);
         const all = [...next, { role: "assistant" as const, content: answer.reply }];
         turnsRef.current = all;
         setTurns(all);
@@ -75,7 +77,7 @@ export default function Talk() {
         setBusy(false);
       }
     },
-    [],
+    [focus],
   );
 
   const send = useCallback(
@@ -115,14 +117,14 @@ export default function Talk() {
   };
 
   return (
-    <Screen title="Talk to Tempo." eyebrow="ASSISTANT">
+    <Screen title={focus ? "Plan a project." : "Talk to Tempo."} eyebrow="ASSISTANT">
       <View style={{ gap: 12 }}>
         {!turns.length && !busy && (
           <Card>
             <Body>
-              Tap the microphone and talk naturally: “Move gym to 7, add call Mum
-              for tomorrow, and I finished the report.” Tempo suggests the
-              changes and nothing happens until you confirm.
+              {focus
+                ? "Tap the microphone and describe your project: what it is, what needs doing and when it’s due. Tempo creates the project, breaks it into tasks and spreads them over the coming days. Nothing happens until you confirm."
+                : "Tap the microphone and talk naturally: “Move gym to 7, add call Mum for tomorrow, and I finished the report.” You can plan the whole week too: “On Monday I have…, on Wednesday I need to…”. Tempo suggests the changes and nothing happens until you confirm."}
             </Body>
           </Card>
         )}
@@ -157,7 +159,14 @@ export default function Talk() {
           <Card style={{ gap: 12 }}>
             <Eyebrow>SUGGESTED CHANGES</Eyebrow>
             {proposal.map((action, i) => (
-              <Body key={i}>• {describe(action, tasks)}</Body>
+              <View key={i} style={{ gap: 2 }}>
+                <Body>• {describe(action, tasks)}</Body>
+                {action.type === "add" && !!action.note && (
+                  <Body small style={{ marginLeft: 14, color: theme.muted }}>
+                    {action.note}
+                  </Body>
+                )}
+              </View>
             ))}
             <View style={{ flexDirection: "row", gap: 10, flexWrap: "wrap" }}>
               <Button

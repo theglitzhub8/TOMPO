@@ -207,6 +207,7 @@ export default function Today() {
                     ? "Your day’s work is done."
                     : "Nothing scheduled right now.")}
               </Heading>
+              {!!next?.note && <Body light>{next.note}</Body>}
               {next ? (
                 <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
                   <Chip icon="timer" tone="dark">

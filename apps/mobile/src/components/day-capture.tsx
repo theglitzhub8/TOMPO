@@ -33,6 +33,14 @@ import {
 } from "../../../../packages/core/src/day-planner";
 import { localParts } from "../../../../packages/core/src/scheduling";
 
+const dayName = (day: string) =>
+  new Date(`${day}T12:00:00Z`).toLocaleDateString(undefined, {
+    weekday: "long",
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  });
+
 // Projects that were deleted while reviewing fall back to "No project".
 function withProjects(
   added: Task[],
@@ -146,6 +154,12 @@ export function DayCapture() {
           }
         : c,
     );
+  // Tasks the person put on other days are saved there and planned when that day comes.
+  const later = capture
+    ? [...new Set(capture.items.map((item) => item.day).filter((d): d is string => !!d && d !== day))]
+        .sort()
+        .map((on) => ({ on, items: capture.items.filter((item) => item.day === on) }))
+    : [];
   const scheduledCount =
     preview?.plan?.blocks.filter((b) => b.kind === "task").length ?? 0;
   return (
@@ -159,7 +173,8 @@ export function DayCapture() {
                 <Heading serif>What’s on your mind today?</Heading>
                 <Body>
                   Chores, work, errands, appointments — tell me everything in
-                  one go. Add times or durations if you know them.
+                  one go. Add times or durations if you know them. Planning the
+                  week? Say “On Monday I have…, on Wednesday…”.
                 </Body>
               </View>
               <VoiceInput
@@ -375,6 +390,33 @@ export function DayCapture() {
               ))}
             </Card>
           )}
+          {!!later.length && (
+            <Card style={{ padding: 18, gap: 12 }}>
+              <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+                <Icon name="calendar" size={17} color={theme.accent} />
+                <Text style={[styles.badge, { color: theme.inkSoft }]}>
+                  LATER THIS WEEK
+                </Text>
+              </View>
+              {later.map(({ on, items }) => (
+                <View key={on} style={{ gap: 4 }}>
+                  <Text style={{ fontFamily: theme.fonts.semibold, fontSize: 14.5, color: theme.ink }}>
+                    {dayName(on)}
+                  </Text>
+                  {items.map((item, i) => (
+                    <Body key={i} small style={{ color: theme.inkSoft }}>
+                      {item.clock ? `${item.clock} · ` : ""}
+                      {item.title} · {item.duration} min
+                    </Body>
+                  ))}
+                </View>
+              ))}
+              <Body small>
+                These are saved on their days. Tasks with a time stay fixed; the
+                rest are planned when you plan that day.
+              </Body>
+            </Card>
+          )}
           <Card style={{ padding: 18 }}>
             <ProjectPicker
               label={
@@ -455,6 +497,13 @@ export function DayCapture() {
                     value={item.title}
                     onChangeText={(title) => update(i, { title })}
                   />
+                  <Field
+                    label="Note"
+                    value={item.note || ""}
+                    multiline
+                    placeholder="Why it matters or how to do it"
+                    onChangeText={(note) => update(i, { note: note || undefined })}
+                  />
                   <View style={{ flexDirection: "row", gap: 12 }}>
                     <View style={{ flex: 1 }}>
                       <Field
@@ -477,6 +526,12 @@ export function DayCapture() {
                       />
                     </View>
                   </View>
+                  <Field
+                    label={`Day YYYY-MM-DD (empty = ${day})`}
+                    icon="calendar"
+                    value={item.day || ""}
+                    onChangeText={(on) => update(i, { day: on || undefined })}
+                  />
                   <Field label="Deadline YYYY-MM-DD (optional)" value={item.dueDay || ""} onChangeText={dueDay => update(i, { dueDay: dueDay || undefined })} />
                   <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
                     {(["low", "normal", "high"] as const).map(priority => <Button key={priority} title={`${priority} priority`} compact variant={(item.priority || "normal") === priority ? "accent" : "secondary"} onPress={() => update(i, { priority })} />)}

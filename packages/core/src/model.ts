@@ -9,6 +9,8 @@ export type Task = {
   completedAt: string | null;
   fixed?: boolean;
   steps?: string[];
+  /** One short sentence on why or how, written by the planner or the person. */
+  note?: string;
   plannedDay?: string;
   dueDay?: string;
   priority?: "low" | "normal" | "high";
@@ -116,7 +118,8 @@ export function validate(
           t.steps.some(
             (s) => typeof s !== "string" || !s.trim() || s.length > 200,
           ))) ||
-      (t.plannedDay !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(t.plannedDay))
+      (t.plannedDay !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(t.plannedDay)) ||
+      (t.note !== undefined && (typeof t.note !== "string" || t.note.length > 300))
     )
       throw new Error("Invalid planning details");
     if ((t.status === "completed") !== (t.completedAt !== null))

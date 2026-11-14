@@ -23,6 +23,7 @@ export function TaskEditor({
   const [dueDay, setDueDay] = useState(task?.dueDay || "");
   const [priority, setPriority] = useState<Task["priority"]>(task?.priority || "normal");
   const [title, setTitle] = useState(task?.title ?? "");
+  const [note, setNote] = useState(task?.note ?? "");
   const [duration, setDuration] = useState(String(task?.duration ?? 25));
   const [projectId, setProject] = useState<string | null>(
     task ? task.projectId : initialProjectId,
@@ -35,6 +36,7 @@ export function TaskEditor({
   return (
     <>
       <Field label="Task title" value={title} onChangeText={setTitle} />
+      <Field label="Note (optional)" value={note} onChangeText={setNote} multiline placeholder="Why it matters or how to do it" />
       <Field
         label="Duration (minutes)"
         value={duration}
@@ -77,6 +79,7 @@ export function TaskEditor({
             ...task,
             id: task?.id ?? id(),
             title: title.trim(),
+            note: note.trim().slice(0, 300) || undefined,
             dueDay: dueDay || undefined,
             priority,
             duration: Number(duration),
@@ -97,6 +100,7 @@ export function TaskEditor({
           await useTempo.getState().refreshRecurring();
           if (!task) {
             setTitle("");
+            setNote("");
             setDay("");
             setClock("");
             setRepeat("none");

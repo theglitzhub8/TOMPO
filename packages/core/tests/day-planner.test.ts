@@ -261,3 +261,27 @@ test("shorter end times leave overflow saved when replanning a full day", () => 
   assert.equal(replanned.overflow.length, 2);
   assert.ok(replanned.tasks.every((t) => t.scheduledAt === null));
 });
+
+test("a spoken week saves each task on its own day with its note", () => {
+  const items = validateCapture({
+    tasks: [
+      { title: "Exercise", note: "A quick sweat wakes you up.", duration: 30, clock: "12:00", steps: [], day: null },
+      { title: "Team meeting", duration: 60, clock: "10:00", steps: [], day: "2030-01-07" },
+      { title: "Buy groceries", duration: 45, clock: null, steps: [], day: "2030-01-09" },
+    ],
+  });
+  let n = 0;
+  const [today, monday, wednesday] = captureTasks(items, "2030-01-05", "UTC", () => `w${n++}`);
+  assert.equal(today.plannedDay, "2030-01-05");
+  assert.equal(today.note, "A quick sweat wakes you up.");
+  assert.equal(monday.scheduledAt, "2030-01-07T10:00:00.000Z");
+  assert.equal(monday.plannedDay, "2030-01-07");
+  assert.equal(wednesday.plannedDay, "2030-01-09");
+  assert.equal(wednesday.scheduledAt, null);
+  assert.equal(wednesday.fixed, false);
+  // Planning today leaves the other days' tasks untouched for later.
+  const plan = buildDay([today, monday, wednesday], [], "2030-01-05", "UTC", new Date("2030-01-05T08:00:00Z"));
+  assert.deepEqual(plan.blocks.map((b) => b.title), ["Exercise"]);
+  assert.deepEqual(plan.tasks.find((t) => t.id === wednesday.id), wednesday);
+  assert.throws(() => validateCapture({ tasks: [{ title: "x", duration: 5, clock: null, steps: [], day: "Friday" }] }));
+});

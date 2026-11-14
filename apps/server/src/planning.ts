@@ -1,4 +1,4 @@
-import { askAi } from "./ai.js";
+import { askAi, calendar } from "./ai.js";
 
 export function validatePlanningInput(input: unknown): {
   text: string;
@@ -40,5 +40,6 @@ export class PlanningLimit {
 }
 /** Receives only the submitted capture; the HTTP handler verifies the account first. */
 export async function planCapture(input: unknown) {
-  return askAi("task-extraction", validatePlanningInput(input));
+  const valid = validatePlanningInput(input);
+  return askAi("task-extraction", { ...valid, calendar: calendar(valid.day) });
 }

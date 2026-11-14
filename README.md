@@ -16,6 +16,12 @@ See `docs/DAY_LIFECYCLE.md` for the initial upgrades and `docs/PRODUCT_UPGRADES.
 
 **Today → Talk to Tempo** opens a voice assistant backed by Moonshot Kimi (`POST /v1/assistant`). Speak or type; when you stop talking it sends your words with a snapshot of your own tasks. Tempo replies in one to three sentences, read aloud unless voice replies are turned off, and may suggest changes: add, rename, retime, move, complete, reopen or delete tasks, or rearrange the rest of today. Suggestions appear as a list and nothing changes until you tap **Apply changes**, which saves them in one revision. The server discards suggestions that refer to tasks you don't own or have invalid times. It also corrects likely speech-recognition mistakes and writes clean task titles.
 
+Every task the AI creates carries a short **note**: one sentence on why it matters or how to do it well. Notes show on Today and in the timeline, and can be edited on any task.
+
+**Week plans:** in Tell Tempo or Talk to Tempo, say what happens on other days ("On Monday I have…, on Wednesday I need to…"). Those tasks are saved on their dates: timed ones stay fixed, the rest wait as flexible tasks until you plan that day. The AI gets a two-week calendar so weekday names resolve to the right dates.
+
+**Projects by voice:** Projects → **Describe a project** opens Talk to Tempo in project mode. Describe the work and deadline; Tempo proposes the project, its tasks (with notes, steps and durations) spread over the coming days, and creates them when you apply.
+
 Tapping a task reminder (not its action buttons) opens a check-in: Tempo asks how the task went and suggests marking it done, adding time, or moving it.
 
 ## Accounts and online storage

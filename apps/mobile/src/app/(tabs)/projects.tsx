@@ -88,12 +88,22 @@ export default function Projects() {
           </Card>
         </Reveal>
       ) : (
-        <Button
-          title="New project"
-          icon="newFolder"
-          variant="accent"
-          onPress={() => setAdding(true)}
-        />
+        <View style={{ flexDirection: "row", gap: 10, flexWrap: "wrap" }}>
+          <Button
+            title="Describe a project"
+            icon="mic"
+            variant="accent"
+            style={{ flex: 1, minWidth: 160 }}
+            onPress={() => router.navigate({ pathname: "/talk", params: { focus: "project" } })}
+          />
+          <Button
+            title="New project"
+            icon="newFolder"
+            variant="secondary"
+            style={{ flex: 1, minWidth: 140 }}
+            onPress={() => setAdding(true)}
+          />
+        </View>
       )}
       {projects.map((project, i) => (
         <Reveal key={project.id} delay={100 + Math.min(i, 6) * 50}>
@@ -119,8 +129,8 @@ export default function Projects() {
             Give your work a home.
           </Text>
           <Body style={{ textAlign: "center", maxWidth: 300 }}>
-            Create a project, then add tasks to it here, from your task list,
-            or while reviewing a plan.
+            Describe a project out loud and Tempo sets it up with tasks, or
+            create one and add tasks to it yourself.
           </Body>
         </Card>
       )}

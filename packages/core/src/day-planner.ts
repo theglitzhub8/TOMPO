@@ -9,6 +9,9 @@ export type CaptureItem = {
   dueDay?: string;
   priority?: "low" | "normal" | "high";
   project?: string;
+  /** The day it happens when that isn't the day being planned. */
+  day?: string;
+  note?: string;
 };
 export type Capture = {
   items: CaptureItem[];
@@ -23,7 +26,7 @@ export function validateCapture(value: unknown): CaptureItem[] {
     !("tasks" in value) ||
     !Array.isArray(value.tasks) ||
     !value.tasks.length ||
-    value.tasks.length > 60
+    value.tasks.length > 100
   )
     throw new Error(
       "The planner could not read your tasks. Your words are still here; try again.",
@@ -39,6 +42,8 @@ export function validateCapture(value: unknown): CaptureItem[] {
       (v.dueDay !== undefined && v.dueDay !== null && !validDay(v.dueDay)) ||
       (v.priority !== undefined && !["low", "normal", "high"].includes(String(v.priority))) ||
       (v.project !== undefined && v.project !== null && (typeof v.project !== "string" || v.project.length > 200)) ||
+      (v.day !== undefined && v.day !== null && !validDay(v.day)) ||
+      (v.note !== undefined && v.note !== null && typeof v.note !== "string") ||
       !Number.isInteger(v.duration) ||
       Number(v.duration) < 1 ||
       Number(v.duration) > 1440 ||
@@ -55,6 +60,8 @@ export function validateCapture(value: unknown): CaptureItem[] {
       ...(v.dueDay ? { dueDay: v.dueDay as string } : {}),
       ...(v.priority ? { priority: v.priority as CaptureItem["priority"] } : {}),
       ...(v.project ? { project: v.project as string } : {}),
+      ...(v.day ? { day: v.day as string } : {}),
+      ...(typeof v.note === "string" && v.note.trim() ? { note: v.note.trim().slice(0, 300) } : {}),
       title: v.title.trim(),
       duration: Number(v.duration),
       clock: v.clock as string | null,
@@ -185,6 +192,7 @@ export function captureTasks(
   makeId: () => string,
 ): Task[] {
   return items.map((item) => {
+    const on = item.day ?? day;
     const task: Task = {
       id: makeId(),
       title: item.title.trim(),
@@ -193,11 +201,12 @@ export function captureTasks(
       status: "pending",
       completedAt: null,
       scheduledAt: item.clock
-        ? localInstant(day, item.clock, timezone).toISOString()
+        ? localInstant(on, item.clock, timezone).toISOString()
         : null,
       fixed: !!item.clock,
       steps: item.steps,
-      plannedDay: day,
+      ...(item.note ? { note: item.note } : {}),
+      plannedDay: on,
       ...(item.dueDay ? { dueDay: item.dueDay } : {}),
       ...(item.priority ? { priority: item.priority } : {}),
     };
