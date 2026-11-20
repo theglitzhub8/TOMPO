@@ -1,6 +1,6 @@
 # Tempo brand kit
 
-The mark combines a lowercase **t**, a gently rising path, and a mint morning sun: one busy mind becoming one clear day.
+The mark combines a lowercase **t**, a gently rising path, and a green sun: one busy mind becoming one clear day. Since the Momentum redesign (November 2026) the **t** runs from electric blue to violet and the sun is the green of a finished task.
 
 ## Assets
 
@@ -17,11 +17,15 @@ App icon and mark masters are 1254 × 1254 pixels. Preserve their square canvas 
 
 | Token | Color | Use |
 | --- | --- | --- |
-| Navy | `#17202A` | Icon background, primary type |
-| Coral | `#E86A4A` | Mark, primary accent |
-| Mint | `#B9E6D3` | Sun, progress, calm highlights |
-| Warm background | `#F5F5F0` | App surfaces |
+| Night | `#0F1120` | Icon background, splash, dark surfaces |
+| Electric blue | `#2B57FF` | The **t**, primary accent: do it now |
+| Violet | `#7B4DFF` | Gradient partner to blue, Tempo orb |
+| Done green | `#13B07B` | The sun, progress, finished tasks |
+| Orange | `#FF6B1A` | Urgent and late |
+| Paper | `#F2F4FA` | App background |
 | White | `#FFFFFF` | Cards and contrast |
+
+The recolored icon and mark keep the original shapes exactly; `tempo-logo.png` (horizontal wordmark) still uses the earlier coral palette and is not used in the app.
 
 Type: Plus Jakarta Sans (400–800) for interface text, Instrument Serif (regular and italic) for display headlines, and a 7 KB Material Symbols subset (`TempoIcons.ttf`) for icons. All are bundled in `assets/fonts` with their licenses. Keep the logo lowercase. Leave clear space around the symbol, avoid stretching, and use the same palette across onboarding, settings, and marketing.
 
