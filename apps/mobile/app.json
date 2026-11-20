@@ -14,7 +14,14 @@
       "entitlements": {
         "com.apple.developer.usernotifications.time-sensitive": true
       },
-      "buildNumber": "1",
+      "buildNumber": "2",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "Tempo doesn’t use your photo library. A built-in component requires this notice, and Tempo never asks for access.",
+        "NSPhotoLibraryAddUsageDescription": "Tempo doesn’t save anything to your photo library.",
+        "NSRemindersUsageDescription": "Tempo doesn’t read your Reminders. Your plan lives in Tempo and your calendar.",
+        "NSRemindersFullAccessUsageDescription": "Tempo doesn’t read your Reminders. Your plan lives in Tempo and your calendar.",
+        "NSFaceIDUsageDescription": "Tempo doesn’t use Face ID."
+      },
       "config": {
         "usesNonExemptEncryption": false
       }
