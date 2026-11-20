@@ -3,6 +3,7 @@ import { Text, View } from "react-native";
 import {
   Action,
   Avatar,
+  Button,
   Card,
   Chip,
   Field,
@@ -95,7 +96,9 @@ export function BackendConnection() {
 }
 
 export function AccountActions() {
-  const { user, reload, signOut } = useTempo();
+  const { user, reload, signOut, deleteAccount } = useTempo();
+  const [deleting, setDeleting] = useState(false);
+  const [confirm, setConfirm] = useState("");
   if (!user) return null;
   return (
     <Group title="ACCOUNT">
@@ -125,6 +128,52 @@ export function AccountActions() {
           Signing out clears your plan from this app’s memory. Sign back in
           to restore it from your account.
         </Text>
+        {deleting ? (
+          <View style={{ gap: 10, padding: 14, borderRadius: 16, backgroundColor: theme.dangerSoft }}>
+            <Text style={{ fontFamily: theme.fonts.bold, fontSize: 14.5, color: theme.danger }}>
+              Delete your account?
+            </Text>
+            <Text style={{ fontFamily: theme.fonts.regular, fontSize: 13.5, lineHeight: 20, color: theme.inkSoft }}>
+              This permanently deletes your account, tasks, projects, weekly
+              schedule, shared tasks and comments from Tempo’s servers. It
+              can’t be undone.
+            </Text>
+            <Field label="Type DELETE to confirm" value={confirm} onChangeText={setConfirm} />
+            <View style={{ flexDirection: "row", gap: 10 }}>
+              <Button
+                title="Keep it"
+                variant="light"
+                compact
+                style={{ flex: 1 }}
+                onPress={() => {
+                  setDeleting(false);
+                  setConfirm("");
+                }}
+              />
+              <Action
+                title="Delete forever"
+                busyTitle="Deleting…"
+                icon="delete"
+                variant="danger"
+                compact
+                style={{ flex: 1 }}
+                run={async () => {
+                  if (confirm.trim() !== "DELETE") throw new Error("Type DELETE in capitals to confirm.");
+                  await deleteAccount();
+                }}
+              />
+            </View>
+          </View>
+        ) : (
+          <Button
+            title="Delete account"
+            icon="delete"
+            variant="ghost"
+            compact
+            style={{ alignSelf: "flex-start" }}
+            onPress={() => setDeleting(true)}
+          />
+        )}
       </View>
     </Group>
   );

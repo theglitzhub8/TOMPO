@@ -14,6 +14,10 @@ import { ReminderSettings } from "../../components/reminder-card";
 import { DriveSettings } from "../../components/drive-settings";
 import { AccountActions, BackendConnection } from "../../components/backend-connection";
 import { useTempo } from "../../data/store";
+import * as WebBrowser from "expo-web-browser";
+import { apiBase } from "../../lib/api";
+
+const openPage = async (path: string) => WebBrowser.openBrowserAsync(`${await apiBase()}${path}`);
 export default function Settings() {
   const { preferences, cloudRequest } = useTempo();
   const [ai, setAi] = useState<boolean | null>(null);
@@ -127,10 +131,13 @@ export default function Settings() {
           </Body>
         </View>
       </Group>
+      <Group title="HELP AND PRIVACY">
+        <ListRow icon="lock" title="Privacy policy" detail="What Tempo stores, why, and how to delete it." onPress={() => void openPage("/privacy")} />
+        <ListRow icon="mail" title="Support" detail="Answers to common questions and how to reach us." onPress={() => void openPage("/support")} last />
+      </Group>
       <AccountActions />
       <Body small style={{ textAlign: "center", marginTop: 4 }}>
-        Your plan follows your account across devices. Background reminders
-        are not connected.
+        Your plan follows your account across devices.
       </Body>
     </Screen>
   );

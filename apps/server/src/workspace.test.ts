@@ -57,6 +57,12 @@ test(
         async () => {
           for (const path of ["/v1/workspace", "/v1/auth/me", "/v1/connection"])
             assert.equal((await call(path)).status, 401);
+          for (const path of ["/privacy", "/support"]) {
+            const page = await fetch(base + path);
+            assert.equal(page.status, 200);
+            assert.match(page.headers.get("content-type") || "", /text\/html/);
+            assert.match(await page.text(), /Delete account/);
+          }
           assert.equal(
             (
               await call("/v1/plan", null, {
@@ -360,6 +366,31 @@ test(
           );
         },
       );
+      await t.test("deleting an account removes it and everything it owns", async () => {
+        const gone = await call("/v1/auth/register", null, {
+          name: "Leaving",
+          email: "leaving@example.test",
+          password: "test-password-leaving",
+        });
+        const token = gone.data.token;
+        assert.equal(
+          (await call("/v1/workspace", token, { revision: 0, changes: [{ kind: "task", id: "bye", payload: { ...task("Bye"), id: "bye" } }] })).status,
+          200,
+        );
+        assert.equal((await call("/v1/auth/delete", token, {})).status, 400);
+        assert.equal((await call("/v1/auth/delete", token, { confirm: "DELETE" })).status, 200);
+        assert.equal((await call("/v1/workspace", token)).status, 401);
+        const left = await store.pool.query(
+          "SELECT (SELECT count(*) FROM users WHERE id=$1)::int AS users, (SELECT count(*) FROM entities WHERE user_id=$1)::int AS records, (SELECT count(*) FROM sessions WHERE user_id=$1)::int AS sessions",
+          [gone.data.user.id],
+        );
+        assert.deepEqual(left.rows[0], { users: 0, records: 0, sessions: 0 });
+        // The email is free to sign up again.
+        assert.equal(
+          (await call("/v1/auth/register", null, { name: "Back", email: "leaving@example.test", password: "test-password-again" })).status,
+          201,
+        );
+      });
       await t.test("expired sessions cannot access cloud data", async () => {
         await store.pool.query(
           "UPDATE sessions SET expires_at=now()-interval '1 second' WHERE user_id=$1",

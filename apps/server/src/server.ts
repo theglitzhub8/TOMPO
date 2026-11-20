@@ -11,6 +11,7 @@ import { Store, WorkspaceConflict } from "./store.js";
 import { PlanningLimit, planCapture } from "./planning.js";
 import { aiConfigured } from "./ai.js";
 import { askAssistant, describeTask } from "./assistant.js";
+import { publicPage } from "./pages.js";
 import { ShareError, Shares } from "./shares.js";
 import { Push, expoSender, type PushSender } from "./push.js";
 
@@ -138,6 +139,17 @@ export function createTempoServer(
       return;
     }
     try {
+      const page = req.method === "GET" ? publicPage(url.pathname) : null;
+      if (page) {
+        res.writeHead(200, {
+          "content-type": "text/html; charset=utf-8",
+          "cache-control": "public, max-age=300",
+          "x-content-type-options": "nosniff",
+          "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'",
+          "referrer-policy": "no-referrer",
+        });
+        return res.end(page);
+      }
       if (req.method === "GET" && url.pathname === "/health")
         return json(res, 200, {
           ok: true,
@@ -227,6 +239,14 @@ export function createTempoServer(
         const input = await body(req).catch(() => ({}));
         await push.unregister(account.id, input.pushToken);
         await auth.logout(token);
+        return json(res, 200, { ok: true });
+      }
+      if (req.method === "POST" && url.pathname === "/v1/auth/delete") {
+        // Deleting the user removes every record that belongs to it (all foreign keys cascade).
+        const input = await body(req).catch(() => ({}));
+        if (input?.confirm !== "DELETE")
+          return json(res, 400, { error: "Type DELETE to confirm." });
+        await store.pool.query("DELETE FROM users WHERE id=$1", [account.id]);
         return json(res, 200, { ok: true });
       }
       if (req.method === "PATCH" && url.pathname === "/v1/auth/me") {

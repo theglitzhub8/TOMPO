@@ -202,6 +202,8 @@ type State = {
   /** Resolves false when the person closes the Hafrik sheet. */
   signInWithHafrik: () => Promise<boolean>;
   signOut: () => Promise<void>;
+  /** Permanently deletes the account and everything in it, then signs out. */
+  deleteAccount: () => Promise<void>;
   updateName: (name: string) => Promise<void>;
   saveTasks: (tasks: Task[]) => Promise<void>;
   /** Saves confirmed assistant changes as one revision. */
@@ -457,6 +459,11 @@ export const useTempo = create<State>((set, get) => {
         } catch {
           /* The local account stays locked even if the network is unavailable. */
         }
+    },
+    deleteAccount: async () => {
+      await writes;
+      await cloud("/v1/auth/delete", { confirm: "DELETE" });
+      await get().signOut();
     },
     reload: async () => {
       const active = connection;
