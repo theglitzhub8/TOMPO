@@ -21,7 +21,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#0F1120",
+        "backgroundColor": "#2B57FF",
         "foregroundImage": "./assets/brand/tempo-mark.png",
         "monochromeImage": "./assets/brand/tempo-mark.png"
       },
