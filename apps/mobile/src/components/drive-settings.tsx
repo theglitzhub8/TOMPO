@@ -4,10 +4,10 @@ import { Action, Field, Icon, Tap, theme } from "./ui";
 import { useTempo, type Preferences } from "../data/store";
 import { setSoundsEnabled, soundsEnabled } from "../lib/celebrate";
 
-const levels: { mode: Preferences["mode"]; title: string; detail: string }[] = [
+export const levels: { mode: Preferences["mode"]; title: string; detail: string }[] = [
   { mode: "Gentle", title: "Gentle", detail: "A heads-up 30 minutes before, and a reminder when it starts." },
   { mode: "Firm", title: "Firm", detail: "Plus a nudge 5 minutes in if you haven’t started." },
-  { mode: "Strict", title: "Strict", detail: "Plus an urgent check-in at 15 minutes that gets through Focus mode. No silent skipping." },
+  { mode: "Strict", title: "Strict", detail: "Plus an urgent check-in at 15 minutes that gets through Focus mode." },
 ];
 
 /** How hard Tempo pushes, and the treat for finishing. */

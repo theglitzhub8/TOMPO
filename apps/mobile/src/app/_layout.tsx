@@ -107,7 +107,7 @@ export default function Layout() {
               />
               <Stack.Screen
                 name="onboarding"
-                options={{ presentation: "modal", animation: "default" }}
+                options={{ presentation: "fullScreenModal", animation: "fade", gestureEnabled: false }}
               />
               <Stack.Screen name="reports" options={{ animation: "default" }} />
               <Stack.Screen

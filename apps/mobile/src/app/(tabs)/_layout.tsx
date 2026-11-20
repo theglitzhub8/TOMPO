@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { AppState } from "react-native";
-import { Tabs } from "expo-router";
+import { Tabs, router } from "expo-router";
 import { BottomBar } from "../../components/navigation";
 import { useTempo } from "../../data/store";
 import { useReminders } from "../../lib/reminders";
@@ -19,9 +19,19 @@ function useBackgroundSync() {
     };
   }, [sync]);
 }
+/** New accounts go through first-run setup once. */
+function useFirstRun() {
+  const due = useTempo((s) => s.ready && !!s.user && !s.preferences.onboardingComplete);
+  useEffect(() => {
+    if (!due) return;
+    const timer = setTimeout(() => router.push("/onboarding"), 300);
+    return () => clearTimeout(timer);
+  }, [due]);
+}
 export default function Layout() {
   useBackgroundSync();
   useReminders();
+  useFirstRun();
   return (
     <Tabs screenOptions={{ headerShown: false }} tabBar={() => <BottomBar />}>
       <Tabs.Screen name="index" options={{ title: "Today" }} />
