@@ -95,6 +95,9 @@
     },
     "runtimeVersion": {
       "policy": "appVersion"
+    },
+    "updates": {
+      "enabled": false
     }
   }
 }
