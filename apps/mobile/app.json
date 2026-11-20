@@ -10,9 +10,13 @@
     "ios": {
       "bundleIdentifier": "com.theglitzhub.tempo",
       "appleTeamId": "PTMQYUSUAT",
-      "supportsTablet": true,
+      "supportsTablet": false,
       "entitlements": {
         "com.apple.developer.usernotifications.time-sensitive": true
+      },
+      "buildNumber": "1",
+      "config": {
+        "usesNonExemptEncryption": false
       }
     },
     "android": {
@@ -22,7 +26,8 @@
         "monochromeImage": "./assets/brand/tempo-mark.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.theglitzhub.tempo"
+      "package": "com.theglitzhub.tempo",
+      "versionCode": 1
     },
     "web": {
       "output": "static",
@@ -52,7 +57,7 @@
       [
         "expo-notifications",
         {
-          "color": "#E86A4A"
+          "color": "#2B57FF"
         }
       ],
       [
@@ -87,6 +92,9 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
     }
   }
 }

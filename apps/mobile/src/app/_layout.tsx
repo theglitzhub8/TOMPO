@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { ActivityIndicator, View, Text } from "react-native";
 import { useFonts } from "expo-font";
-import { Stack } from "expo-router";
+import { Stack, usePathname, type ErrorBoundaryProps } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -9,7 +9,32 @@ import { useTempo } from "../data/store";
 import { WidgetSync } from "../lib/widgets";
 import { Brand } from "../components/brand";
 import { CelebrationLayer, useCompletionTreats } from "../components/celebration";
+import { installCrashReporting, reportCrash, setCrashScreen } from "../lib/crash";
 import { theme, fontAssets, gradient, gradients } from "../design/tokens";
+
+installCrashReporting();
+
+/** Shown instead of a blank screen when something breaks while drawing a screen. */
+export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  useEffect(() => {
+    void reportCrash(error);
+  }, [error]);
+  return (
+    <View style={[{ flex: 1, justifyContent: "center", alignItems: "center", gap: 16, padding: 32, backgroundColor: theme.night }, gradient(gradients.nightGlow)]}>
+      <Text style={{ fontSize: 30, fontWeight: "800", color: theme.surface, textAlign: "center" }}>Something went wrong.</Text>
+      <Text style={{ fontSize: 15, lineHeight: 22, color: theme.darkMuted, textAlign: "center", maxWidth: 320 }}>
+        Your plan is safe. We’ve been sent a report so we can fix it.
+      </Text>
+      <Text
+        accessibilityRole="button"
+        onPress={() => void retry()}
+        style={{ marginTop: 8, paddingHorizontal: 26, paddingVertical: 14, borderRadius: 999, overflow: "hidden", backgroundColor: theme.accent, color: theme.surface, fontSize: 16, fontWeight: "700" }}
+      >
+        Try again
+      </Text>
+    </View>
+  );
+}
 const client = new QueryClient({ defaultOptions: { queries: { retry: 1 } } });
 export default function Layout() {
   const { booting, ready, user, initialize } = useTempo();
@@ -19,6 +44,8 @@ export default function Layout() {
   }, [initialize]);
   const signedIn = !!user && ready;
   useCompletionTreats();
+  const pathname = usePathname();
+  useEffect(() => setCrashScreen(pathname), [pathname]);
   return (
     <SafeAreaProvider>
       <WidgetSync />

@@ -12,6 +12,7 @@ import { PlanningLimit, planCapture } from "./planning.js";
 import { aiConfigured } from "./ai.js";
 import { askAssistant, describeTask } from "./assistant.js";
 import { publicPage } from "./pages.js";
+import { crashReport } from "./crash.js";
 import { ShareError, Shares } from "./shares.js";
 import { Push, expoSender, type PushSender } from "./push.js";
 
@@ -34,6 +35,7 @@ export function createTempoServer(
   const authLimits = new Map<string, { count: number; until: number }>();
   const planningLimit = new PlanningLimit();
   const assistantLimit = new PlanningLimit(120);
+  const crashLimit = new PlanningLimit(30);
   const push = new Push(
     store.pool,
     options.sendPush === undefined ? expoSender : options.sendPush,
@@ -149,6 +151,15 @@ export function createTempoServer(
           "referrer-policy": "no-referrer",
         });
         return res.end(page);
+      }
+      if (req.method === "POST" && url.pathname === "/v1/crash") {
+        // App errors from testers' phones, written to the server log. No account needed:
+        // a crash can happen before sign-in.
+        if (!crashLimit.allow(req.socket.remoteAddress || "unknown")) return json(res, 429, { ok: false });
+        const report = crashReport(await body(req).catch(() => null));
+        if (!report) return json(res, 400, { ok: false });
+        console.error(JSON.stringify({ type: "app-crash", at: new Date().toISOString(), ...report }));
+        return json(res, 200, { ok: true });
       }
       if (req.method === "GET" && url.pathname === "/health")
         return json(res, 200, {
