@@ -14,7 +14,7 @@
       "entitlements": {
         "com.apple.developer.usernotifications.time-sensitive": true
       },
-      "buildNumber": "3",
+      "buildNumber": "4",
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Tempo doesn’t use your photo library. A built-in component requires this notice, and Tempo never asks for access.",
         "NSPhotoLibraryAddUsageDescription": "Tempo doesn’t save anything to your photo library.",
