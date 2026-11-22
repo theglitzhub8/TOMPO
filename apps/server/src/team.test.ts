@@ -163,6 +163,25 @@ test(
           });
           assert.equal(posted.status, 200);
           assert.equal(posted.data.comments[0].message, "First draft ready.");
+          const commentId = posted.data.comments[0].id;
+          assert.equal(posted.data.comments[0].mine, true);
+          // A stranger can't report a comment they can't see; the author can't report their own.
+          assert.equal((await call("/v1/team/report", c.token, { commentId })).status, 400);
+          assert.equal((await call("/v1/team/report", b.token, { commentId })).status, 400);
+          // Reporting hides the comment from the reporter only.
+          assert.equal((await call("/v1/team/report", a.token, { commentId, reason: "Spam" })).status, 200);
+          assert.equal((await call(comments, a.token)).data.comments.length, 0);
+          assert.equal((await call(comments, b.token)).data.comments.length, 1);
+          const reported = await store.pool.query("SELECT reason,status FROM content_reports WHERE comment_id=$1", [commentId]);
+          assert.deepEqual(reported.rows, [{ reason: "Spam", status: "open" }]);
+          // Blocking hides everything from that person and stops them inviting you.
+          await call("/v1/team/comments", b.token, { ownerId: a.user.id, taskId: "task", message: "Second note." });
+          assert.equal((await call(comments, a.token)).data.comments.length, 1);
+          assert.equal((await call("/v1/team/block", a.token, { userId: b.user.id })).status, 200);
+          assert.equal((await call(comments, a.token)).data.comments.length, 0);
+          assert.deepEqual((await call("/v1/team/blocked", a.token)).data.people, [{ id: b.user.id, name: "Member" }]);
+          assert.equal((await call("/v1/team/unblock", a.token, { userId: b.user.id })).status, 200);
+          assert.equal((await call(comments, a.token)).data.comments.length, 1);
           assert.equal(
             (
               await call("/v1/team/done", c.token, {

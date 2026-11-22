@@ -105,6 +105,14 @@ export class Shares {
         "No Tempo account uses that email yet. Ask them to sign up, then add them.",
       );
     if (found.id === owner) throw new ShareError("You’re already on this task.");
+    const blocked = await this.pool.query(
+      "SELECT 1 FROM user_blocks WHERE blocker_id=$1 AND blocked_id=$2",
+      [found.id, owner],
+    );
+    if (blocked.rows.length)
+      throw new ShareError(
+        "No Tempo account uses that email yet. Ask them to sign up, then add them.",
+      );
     const count = await this.pool.query(
       "SELECT count(*)::int AS total FROM task_shares WHERE owner_id=$1 AND task_id=$2",
       [owner, task],

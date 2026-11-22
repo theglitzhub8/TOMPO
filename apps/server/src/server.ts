@@ -339,6 +339,7 @@ export function createTempoServer(
           if(req.method === "GET") {
             if(url.pathname === "/v1/team") return json(res,200,await team.list(account.id));
             if(url.pathname === "/v1/team/planning") return json(res,200,await team.planning(account.id));
+            if(url.pathname === "/v1/team/blocked") return json(res,200,await team.blocked(account.id));
             const owner=url.searchParams.get("owner") || "", record=url.searchParams.get("id") || "";
             if(!/^[a-f0-9-]{36}$/i.test(owner) || !/^[a-zA-Z0-9][a-zA-Z0-9:_-]{0,199}$/.test(record)) return json(res,400,{error:"Choose a valid record."});
             if(url.pathname === "/v1/team/project") return json(res,200,await team.detail(account.id,owner,record));
@@ -351,6 +352,7 @@ export function createTempoServer(
               "/v1/team/invite":team.invite.bind(team), "/v1/team/respond":team.respond.bind(team),
               "/v1/team/remove":team.remove.bind(team), "/v1/team/assign":team.assign.bind(team),
               "/v1/team/done":team.done.bind(team), "/v1/team/comments":team.comment.bind(team), "/v1/team/busy":team.busy.bind(team),
+              "/v1/team/report":team.report.bind(team), "/v1/team/block":team.block.bind(team), "/v1/team/unblock":team.unblock.bind(team),
             };
             if(actions[url.pathname]) return json(res,200,await actions[url.pathname](account.id,input));
           }

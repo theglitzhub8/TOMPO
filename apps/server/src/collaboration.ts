@@ -81,6 +81,12 @@ export class Collaboration {
     const member = r.rows[0]?.id;
     if (!member || member === user)
       throw new TeamError("Choose another person with a Tempo account.");
+    const blocked = await this.pool.query(
+      "SELECT 1 FROM user_blocks WHERE blocker_id=$1 AND blocked_id=$2",
+      [member, user],
+    );
+    if (blocked.rows.length)
+      throw new TeamError("Choose another person with a Tempo account.");
     const count = await this.pool.query(
       "SELECT count(*)::int AS n FROM project_members WHERE owner_id=$1 AND project_id=$2",
       [user, project],
@@ -244,11 +250,114 @@ export class Collaboration {
   }
   async comments(user: string, owner: string, task: string) {
     await this.taskAccess(user, owner, task);
+    // Comments from people this account blocked, and comments it reported, stay hidden from it.
     const r = await this.pool.query(
-      "SELECT c.id,c.message,c.created_at AS at,u.display_name AS name FROM task_comments c JOIN users u ON u.id=c.author_id WHERE c.owner_id=$1 AND c.task_id=$2 ORDER BY c.created_at DESC LIMIT 100",
-      [owner, task],
+      `SELECT c.id,c.message,c.created_at AS at,u.display_name AS name,c.author_id AS "authorId",(c.author_id=$3) AS mine
+      FROM task_comments c JOIN users u ON u.id=c.author_id WHERE c.owner_id=$1 AND c.task_id=$2
+      AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE b.blocker_id=$3 AND b.blocked_id=c.author_id)
+      AND NOT EXISTS(SELECT 1 FROM content_reports r WHERE r.reporter_id=$3 AND r.comment_id=c.id)
+      ORDER BY c.created_at DESC LIMIT 100`,
+      [owner, task, user],
     );
     return { comments: r.rows.reverse() };
+  }
+  async report(user: string, input: any) {
+    const id = uuid(input.commentId);
+    const reason =
+      typeof input.reason === "string" && input.reason.trim()
+        ? input.reason.trim().slice(0, 200)
+        : "Objectionable content";
+    const r = await this.pool.query(
+      "SELECT owner_id,task_id,author_id,message FROM task_comments WHERE id=$1",
+      [id],
+    );
+    const c = r.rows[0];
+    if (!c) throw new TeamError("This comment is no longer available.");
+    await this.taskAccess(user, c.owner_id, c.task_id);
+    if (c.author_id === user)
+      throw new TeamError("You can’t report your own comment.");
+    const saved = await this.pool.query(
+      "INSERT INTO content_reports(reporter_id,comment_id,author_id,message,reason) VALUES($1,$2,$3,$4,$5) RETURNING id",
+      [user, id, c.author_id, c.message, reason],
+    );
+    const report = {
+      type: "content-report",
+      at: new Date().toISOString(),
+      reportId: saved.rows[0].id,
+      commentId: id,
+      reporterId: user,
+      authorId: c.author_id,
+      reason,
+    };
+    console.error(JSON.stringify(report));
+    await this.alert(report, c.message);
+    return { ok: true };
+  }
+  /** Emails the support inbox about a new report, when mail is set up. The report is saved either way. */
+  private async alert(report: Record<string, string>, message: string) {
+    const to = process.env.TEMPO_SUPPORT_EMAIL?.trim();
+    if (!to || !process.env.RESEND_API_KEY || !process.env.TEMPO_MAIL_FROM) return;
+    try {
+      await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        signal: AbortSignal.timeout(10000),
+        headers: {
+          authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          from: process.env.TEMPO_MAIL_FROM,
+          to: [to],
+          subject: "Tempo: a comment was reported",
+          text: `${Object.entries(report).map(([k, v]) => `${k}: ${v}`).join("\n")}\n\nComment:\n${message}\n\nReview it within 24 hours. Remove it with: DELETE FROM task_comments WHERE id='${report.commentId}'; then UPDATE content_reports SET status='removed' WHERE id='${report.reportId}';`,
+        }),
+      });
+    } catch {
+      // The report is already saved and logged.
+    }
+  }
+  async block(user: string, input: any) {
+    const other = uuid(input.userId);
+    if (other === user) throw new TeamError("You can’t block yourself.");
+    await this.pool.query(
+      "INSERT INTO user_blocks(blocker_id,blocked_id) SELECT $1,$2 WHERE EXISTS(SELECT 1 FROM users WHERE id=$2) ON CONFLICT DO NOTHING",
+      [user, other],
+    );
+    // Drop any invitation still waiting from the blocked person.
+    await this.pool.query(
+      "DELETE FROM project_members WHERE owner_id=$2 AND member_id=$1 AND status='pending'",
+      [user, other],
+    );
+    await this.pool.query(
+      "DELETE FROM task_shares WHERE owner_id=$2 AND member_id=$1 AND status='pending'",
+      [user, other],
+    );
+    return { ok: true };
+  }
+  async unblock(user: string, input: any) {
+    await this.pool.query(
+      "DELETE FROM user_blocks WHERE blocker_id=$1 AND blocked_id=$2",
+      [user, uuid(input.userId)],
+    );
+    return { ok: true };
+  }
+  async blocked(user: string) {
+    const r = await this.pool.query(
+      `SELECT b.blocked_id AS id,u.display_name AS name FROM user_blocks b JOIN users u ON u.id=b.blocked_id
+      WHERE b.blocker_id=$1 ORDER BY b.created_at DESC`,
+      [user],
+    );
+    return { people: r.rows };
+  }
+  /** Leaves out recipients who blocked the sender. */
+  private async notBlocking(sender: string, ids: string[]) {
+    if (!ids.length) return ids;
+    const r = await this.pool.query(
+      "SELECT blocker_id AS id FROM user_blocks WHERE blocked_id=$1 AND blocker_id=ANY($2::uuid[])",
+      [sender, ids],
+    );
+    const blocking = new Set(r.rows.map((x) => x.id));
+    return ids.filter((id) => !blocking.has(id));
   }
   async comment(user: string, input: any) {
     const owner = uuid(input.ownerId),
@@ -270,8 +379,11 @@ export class Collaboration {
       [owner, task, payload.projectId],
     );
     await this.push.notify(
-      [...new Set([owner, ...members.rows.map((r) => r.id)])].filter(
-        (id) => id !== user,
+      await this.notBlocking(
+        user,
+        [...new Set([owner, ...members.rows.map((r) => r.id)])].filter(
+          (id) => id !== user,
+        ),
       ),
       "New task comment",
       `New comment on ${payload.title}.`,
