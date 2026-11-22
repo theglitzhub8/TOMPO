@@ -71,10 +71,10 @@ function privacy() {
 <p>Your data is stored on Tempo’s servers so it follows your account across devices. Connections use HTTPS, sessions use random tokens stored only as hashes, and each account can only read its own data.</p>
 
 <h2>Keeping and deleting your data</h2>
-<p>Tempo keeps your data while you have an account. To delete it, open Tempo, go to <b>Settings → Delete account</b> and confirm. This immediately deletes your account and everything in it from Tempo’s database, including tasks, projects, your weekly schedule, shares, comments and push tokens. Copies in server backups are removed as those backups expire. You can also ask us to delete your account by contacting ${contact()}.</p>
+<p>Tempo keeps your data while you have an account. To delete it, open Tempo, go to <b>Me → Delete account</b> and confirm. This immediately deletes your account and everything in it from Tempo’s database, including tasks, projects, your weekly schedule, shares, comments and push tokens. Copies in server backups are removed as those backups expire. You can also ask us to delete your account by contacting ${contact()}.</p>
 
 <h2>Comments, reports and blocking</h2>
-<p>Comments on shared tasks are seen only by the people on that task or project. Tempo has no tolerance for abusive, hateful, sexual or otherwise objectionable comments. Tap <b>Report</b> under any comment to send it to us: it is hidden for you straight away, and we review every report within 24 hours, remove content that breaks these rules and remove accounts that post it. Tap <b>Block</b> to stop seeing a person’s comments and stop them inviting you. You can unblock people under <b>Settings → Blocked people</b>. When you report a comment we keep a copy of it and your reason to review it.</p>
+<p>Comments on shared tasks are seen only by the people on that task or project. Tempo has no tolerance for abusive, hateful, sexual or otherwise objectionable comments. Tap <b>Report</b> under any comment to send it to us: it is hidden for you straight away, and we review every report within 24 hours, remove content that breaks these rules and remove accounts that post it. Tap <b>Block</b> to stop seeing a person’s comments and stop them inviting you. You can unblock people under <b>Me → Blocked people</b>. When you report a comment we keep a copy of it and your reason to review it.</p>
 
 <h2>Children</h2>
 <p>Tempo is not meant for children under 13, and we do not knowingly collect their data.</p>
@@ -98,7 +98,7 @@ function support() {
 </section>
 <section>
 <h2>Reminders don’t arrive</h2>
-<p>Open <b>Settings → Task reminders</b> and turn them on. If they’re blocked, allow notifications for Tempo in your phone’s Settings. Reminders are quiet during your quiet hours, except the start of a task you scheduled.</p>
+<p>Open <b>Me → Task reminders</b> and turn them on. If they’re blocked, allow notifications for Tempo in your phone’s Settings. Reminders are quiet during your quiet hours, except the start of a task you scheduled.</p>
 </section>
 <section>
 <h2>Voice isn’t working</h2>
@@ -106,7 +106,7 @@ function support() {
 </section>
 <section>
 <h2>My plan looks different on another device</h2>
-<p>Your plan follows your account. Open <b>Settings → Refresh saved plan</b>, and make sure both devices are signed in to the same account.</p>
+<p>Your plan follows your account. Open <b>Me → Refresh saved plan</b>, and make sure both devices are signed in to the same account.</p>
 </section>
 <section>
 <h2>Someone posted something abusive</h2>
@@ -114,7 +114,7 @@ function support() {
 </section>
 <section>
 <h2>Delete my account</h2>
-<p>Open <b>Settings → Delete account</b> and type DELETE. Everything is removed from Tempo’s servers. See the <a href="/privacy">privacy policy</a> for details.</p>
+<p>Open <b>Me → Delete account</b> and type DELETE. Everything is removed from Tempo’s servers. See the <a href="/privacy">privacy policy</a> for details.</p>
 </section>`,
   );
 }

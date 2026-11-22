@@ -60,7 +60,7 @@ export function TaskComments({
   const block = (c: Comment) =>
     Alert.alert(
       `Block ${c.name}?`,
-      "You won’t see their comments or get notified about them, and they can’t invite you to projects or tasks. You can unblock them in Settings.",
+      "You won’t see their comments or get notified about them, and they can’t invite you to projects or tasks. You can unblock them in Me → Blocked people.",
       [
         { text: "Cancel", style: "cancel" },
         {

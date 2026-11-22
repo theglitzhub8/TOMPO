@@ -50,7 +50,7 @@ export default function Celebrate() {
               </>
             ) : (
               <Text style={{ fontFamily: theme.fonts.medium, fontSize: 15, lineHeight: 22, color: theme.surface }}>
-                Pick something you’ll look forward to, like an episode, a game or a snack. Set it in Settings → How hard Tempo pushes.
+                Pick something you’ll look forward to, like an episode, a game or a snack. Set it in Me → Your treat.
               </Text>
             )}
           </View>
